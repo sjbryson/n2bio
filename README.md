@@ -70,7 +70,7 @@ Options:
 
 ---
 
-**vref2db/** - NCBI Virus-Host taxonomy DB builder. Create an SQLite database for a set of reference viral sequences (NCBI Accession's). 
+**vref2db/** - NCBI Virus-Host taxonomy DB builder. Create an SQLite database for a set of reference viral sequences (NCBI Accessions). 
 
 1. Start by generating a list of Accession ID's from a fasta file:
 
