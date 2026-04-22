@@ -1,0 +1,14 @@
+/target
+/archive
+/dev_*
+.DS_Store
+.vscode/
+.env
+*.fastq
+*.fq
+*.fasta
+*.fa
+*.bam
+*.sam
+*.vcf
+*.gz
