@@ -1,0 +1,22 @@
+# n2bio/Cargo.toml
+
+[workspace]
+resolver = "2"
+members = [
+    "n2core",
+    "fastfilter",
+    "fastcov",
+    "vref2db",
+    "pfqbz2gz",
+    "pfqsim",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Samuel Bryson <sjbryson@ucla.edu>"]
+description = "A rust workspace for bioinformatics app development"
+edition = "2024"
+
+
+[workspace.dependencies]
+
