@@ -9,7 +9,7 @@
 ### modules:
 
 
-**core/** - Modules I'm developing to work with standard file formats and IO.
+**n2core/** - Modules I'm developing to work with standard file formats and IO.
 
 ---
 
