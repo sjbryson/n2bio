@@ -51,7 +51,7 @@ struct Args {
 
 /// Filter logic for whether an alignment passes - aligned well in this use case.
 fn sam_filter(sam: &SamStr, args: &Args) -> bool {
-    // Keep unmapped reads
+   
     if sam.is_mapped() {
     
         // Evaluate optional filters
@@ -196,7 +196,7 @@ fn main() -> io::Result<()> {
     // ---------------------------------------------------------
     // WORKER THREADS: Parse & Filter
     // ---------------------------------------------------------
-    let mut worker_handles = Vec::with_capacity(args.threads);
+    let mut worker_handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(args.threads);
     for _ in 0..args.threads {
         let rx: crossbeam::channel::Receiver<String>      = line_rx.clone();
         let h_tx: crossbeam::channel::Sender<PipelineMsg> = hit_tx.clone();
@@ -245,10 +245,10 @@ fn main() -> io::Result<()> {
     while let Ok(bytes) = sam_reader.reader.read_line(&mut line_buffer) {
         if bytes == 0 { break; }
         
-        // 1. Pass the stream transparently to stdout immediately
+        // 1. Pass the stream to stdout
         stdout.write_all(line_buffer.as_bytes())?;
 
-        // 2. Process for our JSON report
+        // 2. Process for JSON report
         let clean_line: String = line_buffer.trim_end().to_string();
         
         if clean_line.starts_with('@') {
