@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use std::io::Write;
 use std::collections::HashMap;
+use rusqlite::Connection;
 use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 
 
@@ -47,6 +48,10 @@ struct Args {
     /// Optional: Min MAPQ score - sam.calculate_as_al()
     #[arg(long)]
     min_mq: Option<u32>,
+
+    /// Optional path to an SQLite taxonomy database (see vref2db)
+    #[arg(long)]
+    db: Option<String>,
 }
 
 /// Filter logic for whether an alignment passes - aligned well in this use case.
@@ -282,6 +287,23 @@ fn main() -> io::Result<()> {
     let mut num_refs_secondary: u32 = 0;
     let mut coverage_stats: Vec<serde_json::Value> = Vec::new();
 
+
+    // Setup SQLite Connection & Prepare Statement (if --db is provided)
+    let conn: Option<Connection> = args.db.as_ref().map(|db_path| {
+        rusqlite::Connection::open(db_path).expect("Failed to open SQLite database")
+    });
+
+    let mut stmt: Option<rusqlite::Statement<'_>> = conn.as_ref().map(|c| {
+        c.prepare("SELECT * FROM viral_taxonomy WHERE accession = ?")
+        .expect("Failed to prepare SQL statement")
+    });
+
+    // Array of ranks
+    let ranks: [&str; 8] = [
+        "realm", "kingdom", "phylum", "class", "order", "family","genus", "species"
+    ];
+    
+
     for (_, stats) in ref_map {
         if stats.num_primary   > 0 { num_refs_primary += 1; }
         if stats.num_secondary > 0 { num_refs_secondary += 1; }
@@ -318,6 +340,43 @@ fn main() -> io::Result<()> {
         let k: f64   = ref_len_f64 / 1000.0;
         let rpk: f64 = total_reads as f64 / k;
 
+        // Query the SQLite Database for the Accession
+        let lineage_json: serde_json::Value = if let Some(ref mut statement) = stmt {
+            // Query the DB.
+            let query_result: Result<serde_json::Value, rusqlite::Error> = statement.query_row([&stats.ref_name], |row| {
+                let mut map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+
+                // Get the base taxonomy ID and name first
+                let base_tax_id: Option<i64> = row.get("tax_id").ok();
+                let base_name: Option<String> = row.get("name").ok();
+                if let (Some(id), Some(name)) = (base_tax_id, base_name) {
+                    map.insert("organism".to_string(), serde_json::json!({ "tax_id": id, "name": name }));
+                }
+
+                // Loop through the ranks
+                for rank in ranks.iter() {
+                    let id_col: String = format!("{}_id", rank);
+                    let name_col: String = format!("{}_name", rank);
+                    let id: Option<i64> = row.get(id_col.as_str()).ok();
+                    let name: Option<String> = row.get(name_col.as_str()).ok();
+
+                    // Only add the rank to JSON if both ID and Name exist in the row
+                    if let (Some(rank_id), Some(rank_name)) = (id, name) {
+                        map.insert(rank.to_string(), serde_json::json!({ "tax_id": rank_id, "name": rank_name }));
+                    }
+                }
+                
+                Ok(serde_json::Value::Object(map))
+            });
+
+        // If the query was successful, return it. Otherwise return null.
+            query_result.unwrap_or(serde_json::json!(null))
+        
+        } else {
+            // If --db was not provided (stmt is None), return null.
+            serde_json::json!(null)
+        };
+
         // Helper to format the arrays as comma-separated Strings
         let vec_to_string = |v: &Vec<u32>| v.iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
 
@@ -341,6 +400,7 @@ fn main() -> io::Result<()> {
                     "average_coverage_primary"           : f64::trunc(primary_avg_coverage * 10000.0) / 10000.0,
                     "ref_length"                         : stats.ref_length,
                     "rpk"                                : f64::trunc(rpk * 10000.0) / 10000.0,
+                    "virus_lineage"                      : lineage_json,
                     "x_coverage" : {
                         "primary_coverage"   : vec_to_string(&stats.primary_coverage),
                         "secondary_coverage" : vec_to_string(&stats.secondary_coverage),

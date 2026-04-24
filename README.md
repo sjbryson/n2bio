@@ -61,6 +61,7 @@ And if you want to test filtering parameters from an existing sam/bam file:
 
 samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
 
+If a viral taxonomy db (use option --db <path to SQLite db file>) was created using **vref2dv** lineage data for the associated Accession will be reported.
 
 Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
 
@@ -73,6 +74,7 @@ Options:
       --min-al <MIN_AL>      Optional: Min Alignment Lenth
       --min-sl <MIN_SL>      Optional: Min AS/AL score
       --min-mq <MIN_MQ>      Optional: Min MAPQ score
+      --db <DB>              Optional path to an SQLite taxonomy database (see vref2db)
   -h, --help                 Print help
   -V, --version              Print version
 ```

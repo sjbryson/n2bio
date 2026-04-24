@@ -286,6 +286,7 @@ dependencies = [
  "clap",
  "crossbeam",
  "n2core",
+ "rusqlite",
  "serde_json",
 ]
 
