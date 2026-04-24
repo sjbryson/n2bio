@@ -52,6 +52,15 @@ minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
 fastcov {cov_threads} -r {sample} {min_as} | \
 samtools sort {sort_threads} - -o {sample}.sorted.bam
 
+Or if you don't want to save the sam/bam file - pipe to /dev/null:
+
+minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
+fastcov {cov_threads} -r {sample} {min_as} > /dev/null
+
+And if you want to test filtering parameters from an existing sam/bam file:
+
+samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
+
 
 Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
 
