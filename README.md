@@ -43,7 +43,7 @@ Options:
 
 ---
 
-**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments, or optionally those that score above any of the minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
+**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
 
 ```
 Pipeline example:
