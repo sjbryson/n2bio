@@ -20,7 +20,7 @@ struct Args {
     #[arg(short = 't', long, default_value_t = 4)]
     threads: usize,
 
-   /// Name of the run/sample for the JSON report
+    /// Name of the run/sample for the JSON report
     #[arg(short = 'r', long, required = true)]
     run_name: String,
 
