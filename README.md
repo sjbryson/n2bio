@@ -16,13 +16,13 @@
 ### cli tools:
 
 
-**fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps.
+**fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 
 ```
 Pipeline example:
 
 minimap2 -ax sr --eqx --secondary=no {map_threads} {input_mmi} {r1} {r2} | \
-fastfilter {filter_threads} {max_ap} {max_pi} {max_as} {max_al} {max_sl} {max_mq} --fq-prefix {fq_prefix}
+fastfilter {filter_threads} {max_ap} {max_pi} {max_as} {max_al} {max_sl} {max_mq} {fq_prefix}
 
 
 Usage: fastfilter [OPTIONS] --fq-prefix <FQ_PREFIX>
@@ -33,17 +33,17 @@ Options:
   -p, --fq-prefix <FQ_PREFIX>  Prefix for output files (e.g. 'out' -> out_r1.fq.gz, out_r2.fq.gz)
       --max-ap <MAX_AP>        Optional: Max Alignment Proportion
       --max-pi <MAX_PI>        Optional: Max Percent Identity
-      --max-as <MAX_AS>        Optional: Max Alignment Score for filtering mapped reads
+      --max-as <MAX_AS>        Optional: Max Alignment Score
       --max-al <MAX_AL>        Optional: Max Alignment Lenth
-      --max-sl <MAX_SL>        Optional: Max AS/AL score for filtering mapped reads
-      --max-mq <MAX_MQ>        Optional: Max MAPQ score for filtering mapped reads
+      --max-sl <MAX_SL>        Optional: Max AS/AL score
+      --max-mq <MAX_MQ>        Optional: Max MAPQ score
   -h, --help                   Print help
   -V, --version                Print version
 ```
 
 ---
 
-**fastcov/** - another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file.
+**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments, or optionally those that score above any of the minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
 
 ```
 Pipeline example:
@@ -60,10 +60,10 @@ Options:
   -r, --run-name <RUN_NAME>  Name of the run/sample for the JSON report
       --min-ap <MIN_AP>      Optional: Min Alignment Proportion
       --min-pi <MIN_PI>      Optional: Min Percent Identity
-      --min-as <MIN_AS>      Optional: Min AS score for filtering mapped reads
+      --min-as <MIN_AS>      Optional: Min Alignment Score
       --min-al <MIN_AL>      Optional: Min Alignment Lenth
-      --min-sl <MIN_SL>      Optional: Min AS/AL score for filtering mapped reads
-      --min-mq <MIN_MQ>      Optional: Min MAPQ score for filtering mapped reads
+      --min-sl <MIN_SL>      Optional: Min AS/AL score
+      --min-mq <MIN_MQ>      Optional: Min MAPQ score
   -h, --help                 Print help
   -V, --version              Print version
 ```
