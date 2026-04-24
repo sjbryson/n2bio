@@ -32,7 +32,7 @@ struct Args {
     #[arg(long)]
     min_pi: Option<f32>,
     
-    /// Optional: Min AS score for filtering mapped reads - sam.get_int_tag("AS")
+    /// Optional: Min Alignment Score - sam.get_int_tag("AS")
     #[arg(long)]
     min_as: Option<i32>,
 
@@ -40,11 +40,11 @@ struct Args {
     #[arg(long)]
     min_al: Option<u32>,
     
-    /// Optional: Min AS/AL score for filtering mapped reads - sam.calculate_as_al()
+    /// Optional: Min AS/AL score - sam.calculate_as_al()
     #[arg(long)]
     min_sl: Option<f32>,
 
-    /// Optional: Min MAPQ score for filtering mapped reads - sam.calculate_as_al()
+    /// Optional: Min MAPQ score - sam.calculate_as_al()
     #[arg(long)]
     min_mq: Option<u32>,
 }
@@ -74,7 +74,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
             return true;
         }
     }
-    // If it is mapped but didn't pass any of the specified max thresholds or is unmapped
+    // If it is mapped but didn't pass any of the specified min thresholds or is unmapped
     false
 }
 
