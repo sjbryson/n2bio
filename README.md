@@ -61,7 +61,7 @@ And if you want to test filtering parameters from an existing sam/bam file:
 
 samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
 
-If a viral taxonomy db (use option --db <path to SQLite db file>) was created using **vref2dv** lineage data for the associated Accession will be reported.
+If a viral taxonomy db was created using vref2db (use option --db <path to SQLite db file>) lineage data for the associated Accession will be reported.
 
 Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
 
