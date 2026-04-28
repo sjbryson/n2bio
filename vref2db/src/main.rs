@@ -270,12 +270,11 @@ fn main() -> Result<()> {
     // 1. Load nodes.dmp
     let rank_map = load_nodes(&args.nodes);
 
-    // 2. Parse the JSON file directly from reader to save memory
+    // 2. Parse the JSON file directly from reader
     println!("Parsing JSON report: {}", args.json);
     let file = File::open(&args.json).expect("Failed to open JSON file");
     let reader = BufReader::new(file);
     let dataset: NcbiDataset = serde_json::from_reader(reader).expect("Failed to deserialize JSON");
-
     let mut viral_rows: Vec<TaxonomyRow> = Vec::new();
     let mut host_rows: Vec<TaxonomyRow> = Vec::new();
 
