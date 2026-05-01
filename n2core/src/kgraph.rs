@@ -78,11 +78,11 @@ impl PanGenomeGraph {
     /// graph.save_to_file("virus_pangenome.bin")?;
     /// 
     pub fn save_to_file(&self, path: &str) -> io::Result<()> {
-        let file = File::create(path)?;
-        let writer  = BufWriter::new(file);
+        let file: File = File::create(path)?;
+        let writer: BufWriter<File>  = BufWriter::new(file);
         
         bincode::serialize_into(writer, self)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to serialize graph: {}", e)))
+            .map_err(|e: Box<bincode::ErrorKind>| io::Error::new(io::ErrorKind::Other, format!("Failed to serialize graph: {}", e)))
     }
 
     /// Deserialize the graph from a binary file into memory
@@ -91,11 +91,11 @@ impl PanGenomeGraph {
     /// println!("Loaded graph with {} nodes!", loaded_graph.graph.node_count());
     /// 
     pub fn load_from_file(path: &str) -> io::Result<Self> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
+        let file: File = File::open(path)?;
+        let reader: BufReader<File> = BufReader::new(file);
         
         bincode::deserialize_from(reader)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to deserialize graph: {}", e)))
+            .map_err(|e: Box<bincode::ErrorKind>| io::Error::new(io::ErrorKind::Other, format!("Failed to deserialize graph: {}", e)))
     }
 
     /// Usage:
