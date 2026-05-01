@@ -10,7 +10,7 @@ use std::io::{BufRead, BufReader};
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about = "NCBI Virus-Host Taxonomy DB Builder", long_about = None)]
 struct Args {
-    /// Name of the SQLite database to create (e.g., taxonomy.db)
+    /// Name of the SQLite database to create (e.g., ref_viruses.db)
     #[arg(long, required = true)]
     db: String,
 
@@ -126,22 +126,22 @@ fn parse_lineage(accession: &str, tax_data: &TaxonomyData, rank_map: &HashMap<i6
         for node in lineage {
             if let Some(rank) = rank_map.get(&node.tax_id) {
                 match rank.as_str() {
-                    "realm" => { row.realm_id = Some(node.tax_id); row.realm_name = node.name.clone(); }
-                    "domain" => { row.domain_id = Some(node.tax_id); row.domain_name = node.name.clone(); }
-                    "kingdom" => { row.kingdom_id = Some(node.tax_id); row.kingdom_name = node.name.clone(); }
-                    "phylum" => { row.phylum_id = Some(node.tax_id); row.phylum_name = node.name.clone(); }
-                    "subphylum" => { row.subphylum_id = Some(node.tax_id); row.subphylum_name = node.name.clone(); }
-                    "class" => { row.class_id = Some(node.tax_id); row.class_name = node.name.clone(); }
-                    "subclass" => { row.subclass_id = Some(node.tax_id); row.subclass_name = node.name.clone(); }
-                    "order" => { row.order_id = Some(node.tax_id); row.order_name = node.name.clone(); }
-                    "suborder" => { row.suborder_id = Some(node.tax_id); row.suborder_name = node.name.clone(); }
-                    "family" => { row.family_id = Some(node.tax_id); row.family_name = node.name.clone(); }
-                    "subfamily" => { row.subfamily_id = Some(node.tax_id); row.subfamily_name = node.name.clone(); }
-                    "genus" => { row.genus_id = Some(node.tax_id); row.genus_name = node.name.clone(); }
-                    "subgenus" => { row.subgenus_id = Some(node.tax_id); row.subgenus_name = node.name.clone(); }
-                    "species" => { row.species_id = Some(node.tax_id); row.species_name = node.name.clone(); }
+                    "realm"      => { row.realm_id = Some(node.tax_id); row.realm_name = node.name.clone(); }
+                    "domain"     => { row.domain_id = Some(node.tax_id); row.domain_name = node.name.clone(); }
+                    "kingdom"    => { row.kingdom_id = Some(node.tax_id); row.kingdom_name = node.name.clone(); }
+                    "phylum"     => { row.phylum_id = Some(node.tax_id); row.phylum_name = node.name.clone(); }
+                    "subphylum"  => { row.subphylum_id = Some(node.tax_id); row.subphylum_name = node.name.clone(); }
+                    "class"      => { row.class_id = Some(node.tax_id); row.class_name = node.name.clone(); }
+                    "subclass"   => { row.subclass_id = Some(node.tax_id); row.subclass_name = node.name.clone(); }
+                    "order"      => { row.order_id = Some(node.tax_id); row.order_name = node.name.clone(); }
+                    "suborder"   => { row.suborder_id = Some(node.tax_id); row.suborder_name = node.name.clone(); }
+                    "family"     => { row.family_id = Some(node.tax_id); row.family_name = node.name.clone(); }
+                    "subfamily"  => { row.subfamily_id = Some(node.tax_id); row.subfamily_name = node.name.clone(); }
+                    "genus"      => { row.genus_id = Some(node.tax_id); row.genus_name = node.name.clone(); }
+                    "subgenus"   => { row.subgenus_id = Some(node.tax_id); row.subgenus_name = node.name.clone(); }
+                    "species"    => { row.species_id = Some(node.tax_id); row.species_name = node.name.clone(); }
                     "subspecies" => { row.subspecies_id = Some(node.tax_id); row.subspecies_name = node.name.clone(); }
-                    _ => {} // Safely ignores any intermediate ranks
+                    _            => {} // Safely ignores any intermediate ranks
                 }
             }
         }

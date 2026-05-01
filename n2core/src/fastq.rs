@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 use crate::sam::{SamRecord, SamStr, SamFlags};
 use crate::readers::ReaderType;
-use crate::sequence::reverse_complement;
+use crate::sequence::DnaSequence;
 
 pub trait FastqFormatter {
     fn format_id(id: &str) -> String;
@@ -100,7 +100,7 @@ impl PairedRead {
     pub fn from_samrec(mut rec: SamRecord) -> Self {
         // Reverse-complement if the 0x10 flag is set
         if rec.is_revcomp() {
-            rec.seq = reverse_complement(&rec.seq);
+            rec.seq  = rec.seq.reverse_complement();
             rec.qual = rec.qual.chars().rev().collect();
         }
 

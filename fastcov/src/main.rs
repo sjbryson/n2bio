@@ -241,7 +241,7 @@ fn main() -> io::Result<()> {
     }
 
     // ---------------------------------------------------------
-    // MAIN THREAD: Tee Stream (Stdin -> Stdout + Workers)
+    // MAIN THREAD: Tee off of input stream (Stdin -> Stdout + Workers)
     // ---------------------------------------------------------
     let mut sam_reader: SamReader = SamReader::from_stdin();
     let mut stdout: io::StdoutLock<'_> = io::stdout().lock();

@@ -7,7 +7,7 @@ use std::path::Path;
 use std::borrow::Cow;
 use crate::readers::ReaderType;
 use crate::fastq::{FastqRecord, FastqFormatter};
-use crate::sequence::reverse_complement;
+use crate::sequence::DnaSequence;
 
 /// Core SAM fields access
 pub trait SamFields {
@@ -173,7 +173,7 @@ impl<'a> SamStr<'a> {
         let qual: &str  = fields.next().unwrap_or("");
         //(qname, seq, qual)
         if self.is_revcomp() { 
-            let rc_seq: String = reverse_complement(seq);
+            let rc_seq: String = seq.reverse_complement();
             let rev_qual: String = qual.chars().rev().collect::<String>();
             
             (qname, Cow::Owned(rc_seq), Cow::Owned(rev_qual))
@@ -253,7 +253,7 @@ impl SamRecord {
     
     pub fn into_fastq<T: FastqFormatter>(self) -> FastqRecord<T> {
         let (final_seq, final_qual) = if self.is_revcomp() {
-            let rc_seq: String = reverse_complement(&self.seq);
+            let rc_seq: String = self.seq.reverse_complement();
             let rev_qual: String = self.qual.chars().rev().collect::<String>();
             (rc_seq, rev_qual)
         } else {
