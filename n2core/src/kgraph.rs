@@ -136,7 +136,7 @@ impl PanGenomeGraph {
         for result in assembly_reader {
             let record: crate::fasta::FastaRecord = result?;
             if !record.is_empty() {
-                // Instantly orient the sequence to match the reference strand
+                // Orient the sequence to match the reference strand
                 let oriented_bytes: Vec<u8> = orientor.orient(record.seq.as_bytes());
                 
                 // Convert back to string and add to graph
