@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use crate::sequence::DnaSequence;
 
-pub trait Kmer {
+pub trait KmerHash {
     /// Returns the canonical version of the k-mer for strand-agnostic graph building
     fn canonical(&self) -> Vec<u8>;
     
@@ -15,7 +15,7 @@ pub trait Kmer {
     fn is_minimizer_against(&self, other: &Self) -> bool;
 }
 
-impl Kmer for [u8] {
+impl KmerHash for [u8] {
     fn canonical(&self) -> Vec<u8> {
         let rev_comp: Vec<u8> = self.reverse_complement();
         // Return whichever sequence is lexicographically first
@@ -44,6 +44,9 @@ pub trait KmerEncoding {
     
     /// Decode a u64 integer back into a DNA sequence of length `k`
     fn decode_from_u64(encoded: u64, k: usize) -> Vec<u8>;
+
+    /// Calculate the canonical (lower value) encoding
+    fn canonical_u64(&self) -> u64;
 }
 
 impl KmerEncoding for [u8] {
@@ -58,7 +61,7 @@ impl KmerEncoding for [u8] {
                 b'C' | b'c' => 0b01,
                 b'G' | b'g' => 0b10,
                 b'T' | b't' => 0b11,
-                _ => 0b00, // 'N' is coerced to 'A' in strict 2-bit encoding
+                _           => 0b00, // 'N' is coerced to 'A' in strict 2-bit encoding
             };
         }
         encoded
@@ -75,12 +78,20 @@ impl KmerEncoding for [u8] {
                 0b01 => b'C',
                 0b10 => b'G',
                 0b11 => b'T',
-                _ => unreachable!(),
+                _    => unreachable!(),
             };
             encoded >>= 2; // Shift right by 2 bits for the next iteration
         }
         
         sequence
+    }
+
+    fn canonical_u64(&self) -> u64 {
+        let fwd_u64 = self.encode_to_u64();
+        let rc_u64 = self.reverse_complement().encode_to_u64();
+        
+        // Return the lesser one
+        std::cmp::min(fwd_u64, rc_u64)
     }
 }
 

@@ -5,15 +5,16 @@ use std::io::{self, BufReader, BufWriter};
 use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use crate::sequence::DnaSequence;
-use crate::kmer::Kmer;
+use crate::kmer::KmerEncoding;
 use crate::fasta::FastaReader;
 
 
 /// Data stored in each node
 #[derive(Serialize, Deserialize)]
 pub struct KmerNode {
-    pub canonical_seq: Vec<u8>,
+    pub canonical_u64: u64,
     pub frequency: u32,
     // Use HashSet<String> to track genomes associated with each kmer?
 }
@@ -22,7 +23,7 @@ pub struct PanGenomeGraph {
     /// Petgraph storing nodes and edges
     pub graph: DiGraph<KmerNode, u32>,
     /// Lookup index mapping canonical k-mers to nodes
-    pub node_map: HashMap<Vec<u8>, NodeIndex>,
+    pub node_map: HashMap<u64, NodeIndex>,
     /// K-mer size used for the graph
     pub k: usize,
 }
@@ -42,7 +43,7 @@ impl PanGenomeGraph {
 
         // Calling .as_bytes(), uses the &[u8] implementation of DnaSequence
         for kmer in seq.as_bytes().to_kmers(self.k) {
-            let canonical: Vec<u8> = kmer.canonical();
+            let canonical: u64 = kmer.canonical_u64();
 
             // 1. Get the existing node, or create a new one
             let current_node: NodeIndex = if let Some(&idx) = self.node_map.get(&canonical) {
@@ -50,7 +51,7 @@ impl PanGenomeGraph {
                 idx
             } else {
                 let new_node: KmerNode = KmerNode {
-                    canonical_seq: canonical.clone(),
+                    canonical_u64: canonical.clone(),
                     frequency: 1,
                 };
                 let idx: NodeIndex = self.graph.add_node(new_node);
@@ -119,25 +120,82 @@ impl PanGenomeGraph {
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         let mut graph: PanGenomeGraph = Self::new(k);
 
-        // 1. Ingest the reference backbone
+        // Ingest the reference backbone
         let ref_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(reference_path)?;
-        for result in ref_reader {
-            let record: crate::fasta::FastaRecord = result?;
-            if !record.is_empty() {
-                graph.add_sequence(&record.seq);
-            }
-        }
+        // Assume the first sequence in the reference file is the backbone
+        let ref_record: crate::fasta::FastaRecord = ref_reader.into_iter().next().expect("Reference file is empty")?;
+        let ref_bytes: &[u8] = ref_record.seq.as_bytes();
+        // Add the reference to the graph
+        graph.add_sequence(std::str::from_utf8(ref_bytes).unwrap());
+        
+        // Create the orientor using a small k-mer for flexible mapping (e.g., 15)
+        let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15);
 
-        // 2. Layer the Assemblies on top
+        // Add assemblies to the graph
         let assembly_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(assemblies_path)?;
         for result in assembly_reader {
             let record: crate::fasta::FastaRecord = result?;
             if !record.is_empty() {
-                graph.add_sequence(&record.seq);
+                // Instantly orient the sequence to match the reference strand
+                let oriented_bytes: Vec<u8> = orientor.orient(record.seq.as_bytes());
+                
+                // Convert back to string and add to graph
+                let oriented_str: &str = std::str::from_utf8(&oriented_bytes)
+                    .expect("Invalid UTF-8 after orientation");
+                    
+                graph.add_sequence(oriented_str);
             }
         }
 
         Ok(graph)
-    }   
+    }
 }
 
+pub struct StrandOrientor {
+    /// A set of strictly directional (forward) 2-bit encoded k-mers from the reference
+    reference_kmers: HashSet<u64>,
+    k: usize,
+}
+
+impl StrandOrientor {
+    /// Initializes the orientor using the reference backbone
+    pub fn new(reference: &[u8], k: usize) -> Self {
+        let mut reference_kmers = HashSet::new();
+        
+        for kmer in reference.to_kmers(k) {
+            // Use encode_to_u64(), NOT canonical_u64(), for orientation
+            reference_kmers.insert(kmer.encode_to_u64());
+        }
+        
+        Self { reference_kmers, k }
+    }
+
+    /// Test a sequence and return it correctly oriented to the reference strand
+    pub fn orient(&self, sequence: &[u8]) -> Vec<u8> {
+        let mut fwd_hits: i32 = 0;
+        let mut rc_hits: i32  = 0;
+
+        let rc_seq: Vec<u8> = sequence.reverse_complement();
+
+        // 1. Count hits for the forward sequence
+        for kmer in sequence.to_kmers(self.k) {
+            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+                fwd_hits += 1;
+            }
+        }
+
+        // 2. Count hits for the reverse complement sequence
+        for kmer in rc_seq.to_kmers(self.k) {
+            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+                rc_hits += 1;
+            }
+        }
+
+        // 3. Return whichever sequence maps better to the reference strand
+        if rc_hits > fwd_hits {
+            rc_seq
+        } else {
+            sequence.to_vec()
+        }
+    }
+}
