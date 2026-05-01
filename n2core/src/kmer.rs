@@ -8,10 +8,10 @@ pub trait KmerHash {
     /// Returns the canonical version of the k-mer for strand-agnostic graph building
     fn canonical(&self) -> Vec<u8>;
     
-    /// Generates a standard u64 hash of the k-mer
+    /// Generate a standard u64 hash of the k-mer
     fn kmer_hash(&self) -> u64;
     
-    /// Helper to determine if this k-mer is a minimizer (e.g., lower hash value)
+    /// Helper to determine if the k-mer is a minimizer (e.g., lower hash value)
     fn is_minimizer_against(&self, other: &Self) -> bool;
 }
 
