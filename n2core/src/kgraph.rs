@@ -1,6 +1,8 @@
 //! n2core/src/kgraph.rs
 
-use std::io;
+use std::fs::File;
+use std::io::{self, BufReader, BufWriter};
+use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
 use crate::sequence::{DnaSequence, Kmer};
@@ -8,12 +10,13 @@ use crate::fasta::FastaReader;
 
 
 /// Data stored in each node
+#[derive(Serialize, Deserialize)]
 pub struct KmerNode {
     pub canonical_seq: Vec<u8>,
     pub frequency: u32,
     // Use HashSet<String> to track genomes associated with each kmer?
 }
-
+#[derive(Serialize, Deserialize)]
 pub struct PanGenomeGraph {
     /// Petgraph storing nodes and edges
     pub graph: DiGraph<KmerNode, u32>,
@@ -69,22 +72,48 @@ impl PanGenomeGraph {
         }
     }
 
-    ///Usage:
-    ///fn main() {
-    ///let k = 31; // Standard k-mer size
+    /// Serialize the graph to a binary file
+    /// Example: Build and save
+    /// let graph = PanGenomeGraph::from_fastas("ref.fa", "assemblies.fa", 31)?;
+    /// graph.save_to_file("virus_pangenome.bin")?;
+    /// 
+    pub fn save_to_file(&self, path: &str) -> io::Result<()> {
+        let file = File::create(path)?;
+        let writer  = BufWriter::new(file);
+        
+        bincode::serialize_into(writer, self)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to serialize graph: {}", e)))
+    }
+
+    /// Deserialize the graph from a binary file into memory
+    /// Example: Load and analyze
+    /// let loaded_graph = PanGenomeGraph::load_from_file("virus_pangenome.bin")?;
+    /// println!("Loaded graph with {} nodes!", loaded_graph.graph.node_count());
+    /// 
+    pub fn load_from_file(path: &str) -> io::Result<Self> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        
+        bincode::deserialize_from(reader)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to deserialize graph: {}", e)))
+    }
+
+    /// Usage:
+    /// fn main() {
+    /// let k = 31; // Standard k-mer size
     ///
-    ///match PanGenomeGraph::from_fastas("reference.fasta", "assemblies.fasta", k) {
-    ///    Ok(graph) => {
-    ///        println!(
-    ///            "Successfully built Pan-Genome Graph!\nNodes: {}\nEdges: {}",
-    ///            graph.graph.node_count(),
-    ///            graph.graph.edge_count()
-    ///        );
-    ///    }
-    ///    Err(e) => {
-    ///        eprintln!("Failed to build graph due to an IO error: {}", e);
-    ///    }
-    ///}
+    /// match PanGenomeGraph::from_fastas("reference.fasta", "assemblies.fasta", k) {
+    ///     Ok(graph) => {
+    ///         println!(
+    ///             "Successfully built Pan-Genome Graph!\nNodes: {}\nEdges: {}",
+    ///             graph.graph.node_count(),
+    ///             graph.graph.edge_count()
+    ///         );
+    ///     }
+    ///     Err(e) => {
+    ///         eprintln!("Failed to build graph due to an IO error: {}", e);
+    ///     }
+    /// }
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         let mut graph: PanGenomeGraph = Self::new(k);
 
@@ -107,6 +136,6 @@ impl PanGenomeGraph {
         }
 
         Ok(graph)
-    }
+    }   
 }
 
