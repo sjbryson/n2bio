@@ -114,6 +114,7 @@ impl PanGenomeGraph {
     ///         eprintln!("Failed to build graph due to an IO error: {}", e);
     ///     }
     /// }
+    /// 
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         let mut graph: PanGenomeGraph = Self::new(k);
 
