@@ -7,4 +7,5 @@ pub mod fastq;
 pub mod sam;
 pub mod fasta;
 pub mod sequence;
+pub mod kmer;
 pub mod kgraph;

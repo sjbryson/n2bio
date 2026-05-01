@@ -5,7 +5,8 @@ use std::io::{self, BufReader, BufWriter};
 use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
-use crate::sequence::{DnaSequence, Kmer};
+use crate::sequence::DnaSequence;
+use crate::kmer::Kmer;
 use crate::fasta::FastaReader;
 
 

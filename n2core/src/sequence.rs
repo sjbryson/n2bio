@@ -1,8 +1,5 @@
 //! n2core/src/sequence.rs
 
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
-
 
 pub trait DnaSequence {
     /// Owned type returned by reverse complement (String or Vec<u8>)
@@ -71,41 +68,3 @@ impl DnaSequence for [u8] {
         self.windows(k)
     }
 }
-
-
-pub trait Kmer {
-    /// Returns the canonical version of the k-mer for strand-agnostic graph building
-    fn canonical(&self) -> Vec<u8>;
-    
-    /// Generates a standard u64 hash of the k-mer
-    fn kmer_hash(&self) -> u64;
-    
-    /// Helper to determine if this k-mer is a minimizer (e.g., lower hash value)
-    fn is_minimizer_against(&self, other: &Self) -> bool;
-}
-
-impl Kmer for [u8] {
-    fn canonical(&self) -> Vec<u8> {
-        let rev_comp: Vec<u8> = self.reverse_complement();
-        // Return whichever sequence is lexicographically first
-        if self < &rev_comp[..] {
-            self.to_vec()
-        } else {
-            rev_comp
-        }
-    }
-
-    fn kmer_hash(&self) -> u64 {
-        let mut hasher: DefaultHasher = DefaultHasher::new();
-    
-        self.canonical().hash(&mut hasher);
-        hasher.finish()
-    }
-
-    fn is_minimizer_against(&self, other: &Self) -> bool {
-        self.kmer_hash() < other.kmer_hash()
-    }
-}
-
-
-
