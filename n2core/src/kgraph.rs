@@ -30,11 +30,31 @@ pub struct PanGenomeGraph {
 
 impl PanGenomeGraph {
     pub fn new(k: usize) -> Self {
+        // Enforce k-mer size for 2-bit encoding
+        assert!(k <= 32, "ERROR: K-mer size (k={}) exceeds the maximum of 32 for u64 encoding.", k);
+        assert!(k > 0,   "ERROR: K-mer size must be greater than 0.");
+
         Self {
             graph: DiGraph::new(),
             node_map: HashMap::new(),
             k,
         }
+    }
+
+    /// Try to create a new graph, return Error if k is out of bounds
+    pub fn try_new(k: usize) -> Result<Self, String> {
+        if k > 32 {
+            return Err(format!("K-mer size (k={}) exceeds the maximum of 32 for u64 encoding.", k));
+        }
+        if k == 0 {
+            return Err("K-mer size must be greater than 0.".to_string());
+        }
+
+        Ok(Self {
+            graph: DiGraph::new(),
+            node_map: HashMap::new(),
+            k,
+        })
     }
 
     /// Incorporates a new sequence in the graph
@@ -118,24 +138,29 @@ impl PanGenomeGraph {
     /// }
     /// 
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
-        let mut graph: PanGenomeGraph = Self::new(k);
+        let mut graph: PanGenomeGraph = Self::try_new(k).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 
         // Ingest the reference backbone
         let ref_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(reference_path)?;
+        
         // Assume the first sequence in the reference file is the backbone
         let ref_record: crate::fasta::FastaRecord = ref_reader.into_iter().next().expect("Reference file is empty")?;
         let ref_bytes: &[u8] = ref_record.seq.as_bytes();
+        
         // Add the reference to the graph
         graph.add_sequence(std::str::from_utf8(ref_bytes).unwrap());
         
         // Create the orientor using a small k-mer for flexible mapping (e.g., 15)
+        // ToDo: make k an arg
         let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15);
 
         // Add assemblies to the graph
         let assembly_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(assemblies_path)?;
+        
         for result in assembly_reader {
             let record: crate::fasta::FastaRecord = result?;
             if !record.is_empty() {
+                
                 // Orient the sequence to match the reference strand
                 let oriented_bytes: Vec<u8> = orientor.orient(record.seq.as_bytes());
                 
@@ -152,13 +177,13 @@ impl PanGenomeGraph {
 }
 
 pub struct StrandOrientor {
-    /// A set of strictly directional (forward) 2-bit encoded k-mers from the reference
+    // A set of strictly directional (forward) 2-bit encoded k-mers from the reference
     reference_kmers: HashSet<u64>,
     k: usize,
 }
 
 impl StrandOrientor {
-    /// Initializes the orientor using the reference backbone
+    // Initializes the orientor using the reference backbone
     pub fn new(reference: &[u8], k: usize) -> Self {
         let mut reference_kmers = HashSet::new();
         
