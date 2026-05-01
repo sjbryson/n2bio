@@ -19,7 +19,7 @@ pub trait DnaSequence {
 }
 
 // ---------------------------------------------------------
-// Implementation for OwnedSeq
+// Implementation for str
 // ---------------------------------------------------------
 impl DnaSequence for str {
     type OwnedSeq = String;
@@ -40,9 +40,6 @@ impl DnaSequence for str {
     }
 
     fn to_kmers(&self, k: usize) -> impl Iterator<Item = Self::SeqSlice<'_>> {
-        // Rust strings don't have a `.windows()` method natively because UTF-8 
-        // characters can be variable length. Since DNA is strictly ASCII, 
-        // we can safely drop down to bytes, window them, and convert back to &str.
         self.as_bytes()
             .windows(k)
             .map(|w| std::str::from_utf8(w).expect("Invalid UTF-8 in DNA string"))
@@ -50,7 +47,7 @@ impl DnaSequence for str {
 }
 
 // ---------------------------------------------------------
-// Implementation for SeqSlice
+// Implementation for u8
 // ---------------------------------------------------------
 impl DnaSequence for [u8] {
     type OwnedSeq = Vec<u8>;
@@ -100,8 +97,7 @@ impl Kmer for [u8] {
 
     fn kmer_hash(&self) -> u64 {
         let mut hasher: DefaultHasher = DefaultHasher::new();
-        // In practice, for bioinformatics, you might want to swap DefaultHasher 
-        // with something faster like ahash or wyhash later.
+    
         self.canonical().hash(&mut hasher);
         hasher.finish()
     }
