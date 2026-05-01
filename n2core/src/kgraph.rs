@@ -79,7 +79,7 @@ impl PanGenomeGraph {
     /// 
     pub fn save_to_file(&self, path: &str) -> io::Result<()> {
         let file: File = File::create(path)?;
-        let writer: BufWriter<File>  = BufWriter::new(file);
+        let writer: BufWriter<File> = BufWriter::new(file);
         
         bincode::serialize_into(writer, self)
             .map_err(|e: Box<bincode::ErrorKind>| io::Error::new(io::ErrorKind::Other, format!("Failed to serialize graph: {}", e)))
