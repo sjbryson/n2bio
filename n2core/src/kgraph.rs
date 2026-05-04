@@ -1,9 +1,10 @@
 //! n2core/src/kgraph.rs
 
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter};
+use std::io::{self, BufReader, BufWriter, Write};
 use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use crate::sequence::DnaSequence;
@@ -14,10 +15,16 @@ use crate::fasta::FastaReader;
 /// Data stored in each node
 #[derive(Serialize, Deserialize)]
 pub struct KmerNode {
-    pub canonical_u64: u64,
+    pub kmer_u64: u64,
     pub frequency: u32,
     // Use HashSet<String> to track genomes associated with each kmer?
 }
+
+pub struct CanonicalKmerNode {
+    pub canonical_u64: u64,
+    pub frequency: u32,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct PanGenomeGraph {
     /// Petgraph storing nodes and edges
@@ -63,19 +70,19 @@ impl PanGenomeGraph {
 
         // Calling .as_bytes(), uses the &[u8] implementation of DnaSequence
         for kmer in seq.as_bytes().to_kmers(self.k) {
-            let canonical: u64 = kmer.canonical_u64();
+            let kmer_encoded: u64 = kmer.encode_to_u64();
 
             // 1. Get the existing node, or create a new one
-            let current_node: NodeIndex = if let Some(&idx) = self.node_map.get(&canonical) {
+            let current_node: NodeIndex = if let Some(&idx) = self.node_map.get(&kmer_encoded) {
                 self.graph[idx].frequency += 1;
                 idx
             } else {
                 let new_node: KmerNode = KmerNode {
-                    canonical_u64: canonical.clone(),
+                    kmer_u64: kmer_encoded.clone(),
                     frequency: 1,
                 };
                 let idx: NodeIndex = self.graph.add_node(new_node);
-                self.node_map.insert(canonical, idx);
+                self.node_map.insert(kmer_encoded, idx);
                 idx
             };
 
@@ -120,6 +127,62 @@ impl PanGenomeGraph {
             .map_err(|e: Box<bincode::ErrorKind>| io::Error::new(io::ErrorKind::Other, format!("Failed to deserialize graph: {}", e)))
     }
 
+    /// Exports the graph to a Cytoscape-compatible GraphML file
+    pub fn export_to_graphml(&self, path: &str) -> io::Result<()> {
+        let file: File = File::create(path)?;
+        let mut writer: BufWriter<File> = BufWriter::new(file);
+
+        // 1. Write the standard GraphML XML headers
+        writeln!(writer, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
+        writeln!(writer, "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\"")?;
+        writeln!(writer, "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")?;
+        writeln!(writer, "         xsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">")?;
+        
+        // 2. Define Node Data Keys (Sequence and Frequency)
+        writeln!(writer, "  <key id=\"v_seq\" for=\"node\" attr.name=\"sequence\" attr.type=\"string\"/>")?;
+        writeln!(writer, "  <key id=\"v_freq\" for=\"node\" attr.name=\"frequency\" attr.type=\"int\"/>")?;
+        
+        // 3. Define Edge Data Keys (Weight / Transition Frequency)
+        writeln!(writer, "  <key id=\"e_weight\" for=\"edge\" attr.name=\"weight\" attr.type=\"int\"/>")?;
+
+        // 4. Open the Directed Graph Block
+        writeln!(writer, "  <graph id=\"pangenome\" edgedefault=\"directed\">")?;
+
+        // 5. Iterate and write Nodes
+        for node_idx in self.graph.node_indices() {
+            let node_data = &self.graph[node_idx];
+            
+            // Decode the u64 back to the kmer sequence
+            let seq_bytes: Vec<u8> = <[u8]>::decode_from_u64(node_data.kmer_u64, self.k);
+            let seq_str: &str = std::str::from_utf8(&seq_bytes)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+            // Write the XML block for the node using petgraph's internal index as the ID
+            writeln!(writer, "    <node id=\"n{}\">", node_idx.index())?;
+            writeln!(writer, "      <data key=\"v_seq\">{}</data>", seq_str)?;
+            writeln!(writer, "      <data key=\"v_freq\">{}</data>", node_data.frequency)?;
+            writeln!(writer, "    </node>")?;
+        }
+
+        // 6. Iterate and write Edges
+        for edge in self.graph.edge_references() {
+            let source_idx: usize = edge.source().index();
+            let target_idx: usize = edge.target().index();
+            let weight: &u32      = edge.weight(); // This is the u32 frequency payload
+
+            // Edge IDs are optional in GraphML, so we just declare source and target
+            writeln!(writer, "    <edge source=\"n{}\" target=\"n{}\">", source_idx, target_idx)?;
+            writeln!(writer, "      <data key=\"e_weight\">{}</data>", weight)?;
+            writeln!(writer, "    </edge>")?;
+        }
+
+        // 7. Close the GraphML tags
+        writeln!(writer, "  </graph>")?;
+        writeln!(writer, "</graphml>")?;
+
+        Ok(())
+    }
+
     /// Usage:
     /// fn main() {
     /// let k = 31; // Standard k-mer size
@@ -151,7 +214,6 @@ impl PanGenomeGraph {
         graph.add_sequence(std::str::from_utf8(ref_bytes).unwrap());
         
         // Create the orientor using a small k-mer for flexible mapping (e.g., 15)
-        // ToDo: make k an arg
         let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15);
 
         // Add assemblies to the graph

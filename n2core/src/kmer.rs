@@ -87,8 +87,8 @@ impl KmerEncoding for [u8] {
     }
 
     fn canonical_u64(&self) -> u64 {
-        let fwd_u64 = self.encode_to_u64();
-        let rc_u64 = self.reverse_complement().encode_to_u64();
+        let fwd_u64: u64 = self.encode_to_u64();
+        let rc_u64: u64 = self.reverse_complement().encode_to_u64();
         
         // Return the lesser one
         std::cmp::min(fwd_u64, rc_u64)
