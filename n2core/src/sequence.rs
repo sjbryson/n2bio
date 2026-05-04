@@ -2,10 +2,10 @@
 
 
 pub trait DnaSequence {
-    /// Owned type returned by reverse complement (String or Vec<u8>)
+    /// Owned type (String or Vec<u8>)
     type OwnedSeq;
     
-    /// Borrowed slice yielded by the kmer iterator (&str or &[u8])
+    /// Borrowed slice (&str or &[u8])
     type SeqSlice<'a> where Self: 'a;
 
     /// Returns the reverse complement of the sequence
