@@ -420,7 +420,13 @@ fn main() -> io::Result<()> {
             "passed_primary_alignments"   : passed_primary.load(Ordering::Relaxed),
             "passed_secondary_alignments" : passed_secondary.load(Ordering::Relaxed),
             "num_refs_primary"            : num_refs_primary,
-            "num_refs_secondary"          : num_refs_secondary
+            "num_refs_secondary"          : num_refs_secondary,
+            "min_ap"                      : args.min_ap,
+            "min_pi"                      : args.min_pi,
+            "min_as"                      : args.min_as,
+            "min_al"                      : args.min_al,
+            "min_sl"                      : args.min_sl,
+            "min_mq"                      : args.min_mq,
         },
         "2-coverage_stats"                : coverage_stats
     });
