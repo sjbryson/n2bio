@@ -390,26 +390,26 @@ impl CircularVariationGraph {
 
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         // Initialize the new circular graph safely with try_new
-        let mut graph = Self::try_new(k).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+        let mut graph: CircularVariationGraph = Self::try_new(k).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 
         // Ingest the reference backbone
         let ref_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(reference_path)?;
         
         // Assume the first sequence in the reference file is the backbone
-        let ref_record = ref_reader.into_iter().next().expect("Reference file is empty")?;
+        let ref_record: crate::fasta::FastaRecord = ref_reader.into_iter().next().expect("Reference file is empty")?;
         let ref_bytes: &[u8] = ref_record.seq.as_bytes();
         
         // Add the reference to the graph using the circular initialization
         graph.add_reference_circular(ref_bytes);
         
         // Create the orientor using a small k-mer for flexible mapping (e.g., 15)
-        let orientor = StrandOrientor::new(ref_bytes, 15);
+        let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15);
 
         // Add assemblies to the graph
         let assembly_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(assemblies_path)?;
         
         for result in assembly_reader {
-            let record = result?;
+            let record: crate::fasta::FastaRecord = result?;
             if !record.is_empty() {
                 
                 // Orient the sequence to match the reference strand
