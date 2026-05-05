@@ -1,6 +1,7 @@
 //! n2core/src/kmer.rs
 
 use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use crate::sequence::DnaSequence;
 
@@ -95,3 +96,51 @@ impl KmerEncoding for [u8] {
     }
 }
 
+pub struct StrandOrientor {
+    // A set of strictly directional (forward) 2-bit encoded k-mers from the reference
+    reference_kmers: HashSet<u64>,
+    k: usize,
+}
+
+impl StrandOrientor {
+    // Initializes the orientor using the reference backbone
+    pub fn new(reference: &[u8], k: usize) -> Self {
+        let mut reference_kmers: HashSet<u64> = HashSet::new();
+        
+        for kmer in reference.to_kmers(k) {
+            // Use encode_to_u64(), NOT canonical_u64(), for orientation
+            reference_kmers.insert(kmer.encode_to_u64());
+        }
+        
+        Self { reference_kmers, k }
+    }
+
+    /// Test a sequence and return it correctly oriented to the reference strand
+    pub fn orient(&self, sequence: &[u8]) -> Vec<u8> {
+        let mut fwd_hits: i32 = 0;
+        let mut rc_hits: i32  = 0;
+
+        let rc_seq: Vec<u8> = sequence.reverse_complement();
+
+        // 1. Count hits for the forward sequence
+        for kmer in sequence.to_kmers(self.k) {
+            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+                fwd_hits += 1;
+            }
+        }
+
+        // 2. Count hits for the reverse complement sequence
+        for kmer in rc_seq.to_kmers(self.k) {
+            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+                rc_hits += 1;
+            }
+        }
+
+        // 3. Return whichever sequence maps better to the reference strand
+        if rc_hits > fwd_hits {
+            rc_seq
+        } else {
+            sequence.to_vec()
+        }
+    }
+}

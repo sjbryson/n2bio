@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use crate::sequence::DnaSequence;
-use crate::kmer::KmerEncoding;
+use crate::kmer::{KmerEncoding, StrandOrientor};
 use crate::fasta::FastaReader;
 
 
@@ -20,6 +19,7 @@ pub struct KmerNode {
     // Use HashSet<String> to track genomes associated with each kmer?
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct CanonicalKmerNode {
     pub canonical_u64: u64,
     pub frequency: u32,
@@ -184,21 +184,20 @@ impl PanGenomeGraph {
     }
 
     /// Usage:
-    /// fn main() {
-    /// let k = 31; // Standard k-mer size
     ///
-    /// match PanGenomeGraph::from_fastas("reference.fasta", "assemblies.fasta", k) {
-    ///     Ok(graph) => {
-    ///         println!(
-    ///             "Successfully built Pan-Genome Graph!\nNodes: {}\nEdges: {}",
-    ///             graph.graph.node_count(),
-    ///             graph.graph.edge_count()
-    ///         );
-    ///     }
-    ///     Err(e) => {
-    ///         eprintln!("Failed to build graph due to an IO error: {}", e);
-    ///     }
-    /// }
+    ///     let k = 31; // Standard k-mer size
+    ///
+    ///     match PanGenomeGraph::from_fastas("reference.fasta", "assemblies.fasta", k) {
+    ///         Ok(graph) => {
+    ///             println!(
+    ///                 "Successfully built Pan-Genome Graph!\nNodes: {}\nEdges: {}",
+    ///                  graph.graph.node_count(),
+    ///                  graph.graph.edge_count()
+    ///             );
+    ///         }
+    ///         Err(e) => {
+    ///             eprintln!("Failed to build graph due to an IO error: {}", e);
+    ///         }
     /// 
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         let mut graph: PanGenomeGraph = Self::try_new(k).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
@@ -235,54 +234,5 @@ impl PanGenomeGraph {
         }
 
         Ok(graph)
-    }
-}
-
-pub struct StrandOrientor {
-    // A set of strictly directional (forward) 2-bit encoded k-mers from the reference
-    reference_kmers: HashSet<u64>,
-    k: usize,
-}
-
-impl StrandOrientor {
-    // Initializes the orientor using the reference backbone
-    pub fn new(reference: &[u8], k: usize) -> Self {
-        let mut reference_kmers = HashSet::new();
-        
-        for kmer in reference.to_kmers(k) {
-            // Use encode_to_u64(), NOT canonical_u64(), for orientation
-            reference_kmers.insert(kmer.encode_to_u64());
-        }
-        
-        Self { reference_kmers, k }
-    }
-
-    /// Test a sequence and return it correctly oriented to the reference strand
-    pub fn orient(&self, sequence: &[u8]) -> Vec<u8> {
-        let mut fwd_hits: i32 = 0;
-        let mut rc_hits: i32  = 0;
-
-        let rc_seq: Vec<u8> = sequence.reverse_complement();
-
-        // 1. Count hits for the forward sequence
-        for kmer in sequence.to_kmers(self.k) {
-            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
-                fwd_hits += 1;
-            }
-        }
-
-        // 2. Count hits for the reverse complement sequence
-        for kmer in rc_seq.to_kmers(self.k) {
-            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
-                rc_hits += 1;
-            }
-        }
-
-        // 3. Return whichever sequence maps better to the reference strand
-        if rc_hits > fwd_hits {
-            rc_seq
-        } else {
-            sequence.to_vec()
-        }
     }
 }
