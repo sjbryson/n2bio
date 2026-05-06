@@ -17,7 +17,7 @@ version = "0.1.0"
 authors = ["Samuel Bryson <sjbryson@ucla.edu>"]
 description = "A rust workspace for bioinformatics app development"
 edition = "2024"
-
+license = "MIT"
 
 [workspace.dependencies]
 
