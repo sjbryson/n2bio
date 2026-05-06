@@ -1,4 +1,5 @@
 //! n2core/src/kgraph.rs
+//! Utilities for building a kmer based genome graph and exporting in xml style graphML.
 
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Write};
@@ -7,7 +8,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 use crate::sequence::DnaSequence;
-use crate::kmer::{KmerEncoding, StrandOrientor};
+use crate::kmer::{KmerEncoding, StrandOrientor, KmerError};
 use crate::fasta::FastaReader;
 
 
@@ -65,12 +66,14 @@ impl PanGenomeGraph {
     }
 
     /// Incorporates a new sequence in the graph
-    pub fn add_sequence(&mut self, seq: &str) {
+    pub fn add_sequence(&mut self, seq: &str) -> Result<(), KmerError> {
         let mut prev_node: Option<NodeIndex> = None;
 
         // Calling .as_bytes(), uses the &[u8] implementation of DnaSequence
-        for kmer in seq.as_bytes().to_kmers(self.k) {
-            let kmer_encoded: u64 = kmer.encode_to_u64();
+        let kmers = seq.as_bytes().to_kmers(self.k)?;
+        
+        for kmer in kmers {
+            let kmer_encoded: u64 = kmer.encode_to_u64()?;
 
             // 1. Get the existing node, or create a new one
             let current_node: NodeIndex = if let Some(&idx) = self.node_map.get(&kmer_encoded) {
@@ -78,7 +81,7 @@ impl PanGenomeGraph {
                 idx
             } else {
                 let new_node: KmerNode = KmerNode {
-                    kmer_u64: kmer_encoded.clone(),
+                    kmer_u64: kmer_encoded, // u64 is Copy, no need to .clone()
                     frequency: 1,
                 };
                 let idx: NodeIndex = self.graph.add_node(new_node);
@@ -99,6 +102,8 @@ impl PanGenomeGraph {
             // Move the window forward
             prev_node = Some(current_node);
         }
+        
+        Ok(())
     }
 
     /// Serialize the graph to a binary file
@@ -183,22 +188,7 @@ impl PanGenomeGraph {
         Ok(())
     }
 
-    /// Usage:
-    ///
-    ///     let k = 31; // Standard k-mer size
-    ///
-    ///     match PanGenomeGraph::from_fastas("reference.fasta", "assemblies.fasta", k) {
-    ///         Ok(graph) => {
-    ///             println!(
-    ///                 "Successfully built Pan-Genome Graph!\nNodes: {}\nEdges: {}",
-    ///                  graph.graph.node_count(),
-    ///                  graph.graph.edge_count()
-    ///             );
-    ///         }
-    ///         Err(e) => {
-    ///             eprintln!("Failed to build graph due to an IO error: {}", e);
-    ///         }
-    /// 
+    
     pub fn from_fastas(reference_path: &str, assemblies_path: &str, k: usize) -> io::Result<Self> {
         let mut graph: PanGenomeGraph = Self::try_new(k).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 
@@ -209,11 +199,13 @@ impl PanGenomeGraph {
         let ref_record: crate::fasta::FastaRecord = ref_reader.into_iter().next().expect("Reference file is empty")?;
         let ref_bytes: &[u8] = ref_record.seq.as_bytes();
         
-        // Add the reference to the graph
-        graph.add_sequence(std::str::from_utf8(ref_bytes).unwrap());
+        // Add the reference to the graph, mapping KmerError to io::Error
+        graph.add_sequence(std::str::from_utf8(ref_bytes).unwrap())
+             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to add reference sequence: {}", e)))?;
         
         // Create the orientor using a small k-mer for flexible mapping (e.g., 15)
-        let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15);
+        let orientor: StrandOrientor = StrandOrientor::new(ref_bytes, 15)
+             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to initialize orientor: {}", e)))?;
 
         // Add assemblies to the graph
         let assembly_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(assemblies_path)?;
@@ -223,13 +215,15 @@ impl PanGenomeGraph {
             if !record.is_empty() {
                 
                 // Orient the sequence to match the reference strand
-                let oriented_bytes: Vec<u8> = orientor.orient(record.seq.as_bytes());
+                let oriented_bytes: Vec<u8> = orientor.orient(record.seq.as_bytes())
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to orient sequence: {}", e)))?;
                 
                 // Convert back to string and add to graph
                 let oriented_str: &str = std::str::from_utf8(&oriented_bytes)
                     .expect("Invalid UTF-8 after orientation");
                     
-                graph.add_sequence(oriented_str);
+                graph.add_sequence(oriented_str)
+                     .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to add assembly sequence: {}", e)))?;
             }
         }
 

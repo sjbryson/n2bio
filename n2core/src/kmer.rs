@@ -1,12 +1,33 @@
 //! n2core/src/kmer.rs
+//! Utilities for k-mer hashing, encoding, and strand orientation.
 
-use std::hash::{Hash, Hasher};
-use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
-use crate::sequence::DnaSequence;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+use thiserror::Error;
 
+use crate::sequence::{DnaSequence, SequenceError};
+
+// ============================================================================
+// Errors
+// ============================================================================
+
+#[derive(Error, Debug, PartialEq)]
+pub enum KmerError {
+    #[error("K-mer length {0} exceeds the maximum allowed (32) for u64 encoding.")]
+    KmerTooLong(usize),
+
+    #[error("Sequence error: {0}.")]
+    Sequence(#[from] SequenceError),
+}
+
+// ============================================================================
+// Traits
+// ============================================================================
+
+/// Hash based kmer encoding
 pub trait KmerHash {
-    /// Returns the canonical version of the k-mer for strand-agnostic graph building
+    /// Returns the canonical version of the k-mer
     fn canonical(&self) -> Vec<u8>;
     
     /// Generate a standard u64 hash of the k-mer
@@ -15,6 +36,22 @@ pub trait KmerHash {
     /// Helper to determine if the k-mer is a minimizer (e.g., lower hash value)
     fn is_minimizer_against(&self, other: &Self) -> bool;
 }
+
+/// Two-bit kmer encoding
+pub trait KmerEncoding {
+    /// Compresse a kmer (byte slice) into a u64 integer
+    fn encode_to_u64(&self) -> Result<u64, KmerError>;
+    
+    /// Decode a u64 integer back into a DNA sequence of length `k`
+    fn decode_from_u64(encoded: u64, k: usize) -> Vec<u8>;
+
+    /// Calculate the canonical (lower value) encoding
+    fn canonical_u64(&self) -> Result<u64, KmerError>;
+}
+
+// ============================================================================
+// Implementations
+// ============================================================================
 
 impl KmerHash for [u8] {
     fn canonical(&self) -> Vec<u8> {
@@ -29,7 +66,6 @@ impl KmerHash for [u8] {
 
     fn kmer_hash(&self) -> u64 {
         let mut hasher: DefaultHasher = DefaultHasher::new();
-    
         self.canonical().hash(&mut hasher);
         hasher.finish()
     }
@@ -39,21 +75,11 @@ impl KmerHash for [u8] {
     }
 }
 
-pub trait KmerEncoding {
-    /// Compresse a kmer (byte slice) into a u64 integer
-    fn encode_to_u64(&self) -> u64;
-    
-    /// Decode a u64 integer back into a DNA sequence of length `k`
-    fn decode_from_u64(encoded: u64, k: usize) -> Vec<u8>;
-
-    /// Calculate the canonical (lower value) encoding
-    fn canonical_u64(&self) -> u64;
-}
-
 impl KmerEncoding for [u8] {
-    fn encode_to_u64(&self) -> u64 {
-        assert!(self.len() <= 32, "k-mer must be 32 bases or fewer to fit in a u64");
-        
+    fn encode_to_u64(&self) -> Result<u64, KmerError> {
+        if self.len() > 32 {
+            return Err(KmerError::KmerTooLong(self.len()));
+        }
         let mut encoded: u64 = 0u64;
         for &base in self {
             encoded <<= 2; // Shift left by 2 bits for the next base
@@ -65,7 +91,7 @@ impl KmerEncoding for [u8] {
                 _           => 0b00, // 'N' is coerced to 'A' in strict 2-bit encoding
             };
         }
-        encoded
+        Ok(encoded)
     }
 
     fn decode_from_u64(mut encoded: u64, k: usize) -> Vec<u8> {
@@ -87,14 +113,19 @@ impl KmerEncoding for [u8] {
         sequence
     }
 
-    fn canonical_u64(&self) -> u64 {
-        let fwd_u64: u64 = self.encode_to_u64();
-        let rc_u64: u64 = self.reverse_complement().encode_to_u64();
+    fn canonical_u64(&self) -> Result<u64, KmerError> {
+        let fwd_u64: u64 = self.encode_to_u64()?;
+        let rc_u64: u64 = self.reverse_complement().encode_to_u64()?;
         
         // Return the lesser one
-        std::cmp::min(fwd_u64, rc_u64)
+        Ok(std::cmp::min(fwd_u64, rc_u64))
     }
 }
+
+
+// ============================================================================
+// Kmer based orientor
+// ============================================================================
 
 pub struct StrandOrientor {
     // A set of strictly directional (forward) 2-bit encoded k-mers from the reference
@@ -104,43 +135,92 @@ pub struct StrandOrientor {
 
 impl StrandOrientor {
     // Initializes the orientor using the reference backbone
-    pub fn new(reference: &[u8], k: usize) -> Self {
+    pub fn new(reference: &[u8], k: usize) -> Result<Self, KmerError> {
         let mut reference_kmers: HashSet<u64> = HashSet::new();
-        
-        for kmer in reference.to_kmers(k) {
-            // Use encode_to_u64(), NOT canonical_u64(), for orientation
-            reference_kmers.insert(kmer.encode_to_u64());
+        let kmers = reference.to_kmers(k)?;
+        for kmer in kmers {
+            reference_kmers.insert(kmer.encode_to_u64()?);
         }
-        
-        Self { reference_kmers, k }
+
+        Ok(Self { reference_kmers, k })
     }
 
     /// Test a sequence and return it correctly oriented to the reference strand
-    pub fn orient(&self, sequence: &[u8]) -> Vec<u8> {
-        let mut fwd_hits: i32 = 0;
-        let mut rc_hits: i32  = 0;
+    pub fn orient(&self, sequence: &[u8]) -> Result<Vec<u8>, KmerError> {
+        let mut fwd_hits = 0;
+        let mut rc_hits = 0;
 
-        let rc_seq: Vec<u8> = sequence.reverse_complement();
+        let kmers = sequence.to_kmers(self.k)?;
 
-        // 1. Count hits for the forward sequence
-        for kmer in sequence.to_kmers(self.k) {
-            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+        // Single loop: test both forward and RC encoded k-mers against the reference
+        for kmer in kmers {
+            let fwd_encoded: u64 = kmer.encode_to_u64()?;
+            if self.reference_kmers.contains(&fwd_encoded) {
                 fwd_hits += 1;
             }
-        }
 
-        // 2. Count hits for the reverse complement sequence
-        for kmer in rc_seq.to_kmers(self.k) {
-            if self.reference_kmers.contains(&kmer.encode_to_u64()) {
+            let rc_encoded: u64 = kmer.reverse_complement().encode_to_u64()?;
+            if self.reference_kmers.contains(&rc_encoded) {
                 rc_hits += 1;
             }
         }
 
-        // 3. Return whichever sequence maps better to the reference strand
+        // Return whichever sequence mapped better to the reference strand.
         if rc_hits > fwd_hits {
-            rc_seq
+            Ok(sequence.reverse_complement())
         } else {
-            sequence.to_vec()
+            Ok(sequence.to_vec())
         }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_u64() {
+        let seq: &[u8; 8] = b"ACGTACGT";
+        let encoded: u64 = seq.encode_to_u64().unwrap();
+        let decoded: Vec<u8> = <[u8]>::decode_from_u64(encoded, seq.len());
+        assert_eq!(seq.as_ref(), decoded.as_slice());
+    }
+
+    #[test]
+    fn test_encode_too_long() {
+        // 33 bases (max is 32)
+        let seq: &[u8; 33] = b"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; 
+        let err: KmerError = seq.encode_to_u64().unwrap_err();
+        assert_eq!(err, KmerError::KmerTooLong(33));
+    }
+
+    #[test]
+    fn test_canonical_u64() {
+        let seq1: &[u8; 4] = b"ACGT";
+        let seq2: Vec<u8> = b"ACGT".reverse_complement();
+        let can1: u64 = seq1.canonical_u64().unwrap();
+        let can2: u64 = seq2.canonical_u64().unwrap();
+        assert_eq!(can1, can2);
+    }
+
+    #[test]
+    fn test_strand_orientor() {
+        // Test 1: Sequence is already in the forward orientation
+        let reference: &[u8; 12] = b"ATGCATGCATGC";
+        let orientor: StrandOrientor = StrandOrientor::new(reference, 4).unwrap();
+        let fwd_query: &[u8; 6] = b"ATGCAT";
+        let oriented_fwd: Vec<u8> = orientor.orient(fwd_query).unwrap();
+        assert_eq!(oriented_fwd, b"ATGCAT");
+
+        // Test 2: Sequence is reverse complemented and needs to be flipped
+        let pure_fwd: &[u8; 7] = b"GATTACA"; 
+        let pure_rc: Vec<u8> = pure_fwd.reverse_complement(); // b"TGTAATC"
+        let orientor2: StrandOrientor = StrandOrientor::new(pure_fwd, 4).unwrap();
+        let result = orientor2.orient(&pure_rc).unwrap();
+        assert_eq!(result, pure_fwd);
     }
 }

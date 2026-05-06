@@ -75,7 +75,6 @@ impl BufRead for ReaderType {
         }
     }
 
-    // Overriding read_line is more efficient for BufReaders
     fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
         match self {
             ReaderType::Stdin(r) => r.read_line(buf),

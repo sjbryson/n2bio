@@ -9,4 +9,4 @@ pub mod fasta;
 pub mod sequence;
 pub mod kmer;
 pub mod kgraph;
-pub mod circgraph;
+// pub mod circgraph;

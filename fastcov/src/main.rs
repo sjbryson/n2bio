@@ -60,19 +60,19 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if sam.is_mapped() {
     
         // Evaluate optional filters
-        if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().is_some_and(|val: f32| val >= min)) {
+        if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val >= min)) {
             return true;
         }
-        if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_accuracy().is_some_and(|val: f32| val >= min)) {
+        if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_accuracy().ok().flatten().is_some_and(|val: f32| val >= min)) {
             return true;
         }
         if args.min_as.is_some_and(|min: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val >= min)) {
             return true;
         }
-        if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().is_some_and(|val: u32| val >= min)) {
+        if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val >= min)) {
             return true;
         }
-        if args.min_sl.is_some_and(|min: f32| sam.calculate_as_al().is_some_and(|val: f32| val >= min)) {
+        if args.min_sl.is_some_and(|min: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val >= min)) {
             return true;
         }
         if args.min_mq.is_some_and(|min: u32| sam.mapq() >= min) {
