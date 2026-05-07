@@ -607,16 +607,16 @@ mod tests {
     #[test]
     fn test_fastq_reader() {
         // Mock a simple FASTQ file in memory
-        let fq_data = b"@read_A\nACGT\n+\n!!!!\n@read_B\nTGCA\n+\n####\n";
-        let cursor = Cursor::new(fq_data);
-        let mut reader = FastqReader::<_, SingleRead>::new(cursor);
+        let fq_data: &[u8; 40] = b"@read_A\nACGT\n+\n!!!!\n@read_B\nTGCA\n+\n####\n";
+        let cursor: Cursor<&[u8; 40]> = Cursor::new(fq_data);
+        let mut reader: FastqReader<Cursor<&[u8; 40]>, SingleRead> = FastqReader::<_, SingleRead>::new(cursor);
         
-        let rec1 = reader.next().unwrap().unwrap();
+        let rec1: FastqRecord<SingleRead> = reader.next().unwrap().unwrap();
         assert_eq!(rec1.id, "read_A");
         assert_eq!(rec1.seq, "ACGT");
         assert_eq!(rec1.qual, "!!!!");
 
-        let rec2 = reader.next().unwrap().unwrap();
+        let rec2: FastqRecord<SingleRead> = reader.next().unwrap().unwrap();
         assert_eq!(rec2.id, "read_B");
         assert_eq!(rec2.seq, "TGCA");
         assert_eq!(rec2.qual, "####");
@@ -626,20 +626,20 @@ mod tests {
 
     #[test]
     fn test_truncated_fastq() {
-        let fq_data = b"@read_A\nACGT\n+\n"; // Missing qual line
-        let cursor = Cursor::new(fq_data);
-        let mut reader = FastqReader::<_, SingleRead>::new(cursor);
+        let fq_data: &[u8; 15] = b"@read_A\nACGT\n+\n"; // Missing qual line
+        let cursor: Cursor<&[u8; 15]> = Cursor::new(fq_data);
+        let mut reader: FastqReader<Cursor<&[u8; 15]>, SingleRead> = FastqReader::<_, SingleRead>::new(cursor);
         
-        let result = reader.next().unwrap();
+        let result: Result<FastqRecord<SingleRead>, io::Error> = reader.next().unwrap();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }
 
     #[test]
     fn test_mate_map() {
-        let mut map = MateMap::new();
-        let r1 = PairedRead::R1(FastqRecord::<Read1>::new("pair1".to_string(), "A".to_string(), "!".to_string()));
-        let r2 = PairedRead::R2(FastqRecord::<Read2>::new("pair1".to_string(), "C".to_string(), "!".to_string()));
+        let mut map: MateMap = MateMap::new();
+        let r1: PairedRead = PairedRead::R1(FastqRecord::<Read1>::new("pair1".to_string(), "A".to_string(), "!".to_string()));
+        let r2: PairedRead = PairedRead::R2(FastqRecord::<Read2>::new("pair1".to_string(), "C".to_string(), "!".to_string()));
         
         // Processing R1 first should cache it and return None
         assert!(map.process(r1).is_none());
