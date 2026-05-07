@@ -6,11 +6,11 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+use thiserror::Error;
 
 use crate::fastq::{FastqFormatter, FastqRecord};
 use crate::readers::ReaderType;
 use crate::sequence::DnaSequence;
-use thiserror::Error;
 
 // ============================================================================
 // Errors
@@ -48,7 +48,7 @@ pub trait SamFields {
     fn qname(&self) -> &str;   // QNAME  (str): Query template NAME
     fn rname(&self) -> &str;   // RNAME  (str): Reference sequence NAME
     fn pos(&self)   -> u32;    // POS    (int): 1-based leftmost mapping POSition, 0 = unmapped
-    fn mapq(&self)  -> u32;     // MAPQ   (int): MAPping Quality
+    fn mapq(&self)  -> u32;    // MAPQ   (int): MAPping Quality
     fn cigar(&self) -> &str;   // CIGAR  (str): CIGAR string
     fn rnext(&self) -> &str;   // RNEXT  (str): Reference name of the mate/next read
     fn pnext(&self) -> u32;    // PNEXT  (int): Position of the mate/next read
@@ -199,7 +199,6 @@ impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
 // ============================================================================
 // Struct for Borrowed SAM record: SamStr (maybe change to BorrowedSam)
 // ============================================================================
-
 
 /// Struct representing a single SAM alignment record in a zero-allocation str format
 pub struct SamStr<'a> {
@@ -402,13 +401,13 @@ impl Iterator for SamReader {
     type Item = Result<SamRecord, SamError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut line = String::new();
+        let mut line: String = String::new();
         loop {
             line.clear();
             match self.reader.read_line(&mut line) {
                 Ok(0) => return None,
                 Ok(_) => {
-                    let trimmed = line.trim_end();
+                    let trimmed: &str = line.trim_end();
                     if trimmed.is_empty() { continue; }
                     if trimmed.starts_with('@') {
                         self.headers.push(trimmed.to_string());
@@ -422,7 +421,7 @@ impl Iterator for SamReader {
     }
 }
 
-/// A reader optimized for parallel processing chunk by chunk via Rayon.
+/// A reader for parallel processing chunk by chunk via Rayon.
 pub struct ChunkySamReader<R: BufRead> {
     reader:         R,
     pub headers:    Vec<String>,
@@ -439,15 +438,15 @@ impl<R: BufRead> ChunkySamReader<R> {
     }
 
     pub fn next_chunk(&mut self) -> Result<Option<Vec<String>>, SamError> {
-        let mut chunk = Vec::with_capacity(self.chunk_size);
-        let mut line_buffer = String::with_capacity(1024);
+        let mut chunk: Vec<String> = Vec::with_capacity(self.chunk_size);
+        let mut line_buffer: String = String::with_capacity(1024);
 
         while chunk.len() < self.chunk_size {
             line_buffer.clear();
             match self.reader.read_line(&mut line_buffer) {
                 Ok(0) => break, // EOF
                 Ok(_) => {
-                    let trimmed = line_buffer.trim_end();
+                    let trimmed: &str = line_buffer.trim_end();
                     if trimmed.is_empty() { continue; }
 
                     if trimmed.starts_with('@') {
@@ -522,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_sam_record_conversion() {
-        let record = SamRecord::from_str(TEST_SAM_LINE).unwrap();
+        let record: SamRecord = SamRecord::from_str(TEST_SAM_LINE).unwrap();
         assert_eq!(record.qname, "read_1");
         assert!(record.is_read1());
         assert!(record.is_proper());

@@ -74,7 +74,7 @@ impl<R: BufRead> Iterator for FastaReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // 1. Determine the header for the current record
-        let header_line = match self.next_header.take() {
+        let header_line: String = match self.next_header.take() {
             Some(h) => h,
             None => {
                 loop {
@@ -97,14 +97,14 @@ impl<R: BufRead> Iterator for FastaReader<R> {
         let (id, desc) = parse_fasta_header(&header_line);
         
         // 3. Read the sequence lines until we hit the next '>' or EOF
-        let mut seq = String::with_capacity(2048);
+        let mut seq: String = String::with_capacity(2048);
         
         loop {
             self.line_buffer.clear();
             match self.reader.read_line(&mut self.line_buffer) {
                 Ok(0) => break, // EOF, return what we have
                 Ok(_) => {
-                    let trimmed = self.line_buffer.trim_end();
+                    let trimmed: &str = self.line_buffer.trim_end();
                     if trimmed.is_empty() {
                         continue;
                     }

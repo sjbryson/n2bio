@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
+
 use crate::sequence::DnaSequence;
 use crate::kmer::{KmerEncoding, StrandOrientor, KmerError};
 use crate::fasta::FastaReader;

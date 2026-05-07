@@ -2,13 +2,19 @@
 
 use std::io::{self, Write, BufRead};
 use std::marker::PhantomData;
-use std::collections::HashMap;
-use rustc_hash::{FxHashMap, FxHasher};
-use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use rustc_hash::{FxHashMap, FxHasher};
+
 use crate::sam::{SamRecord, SamStr, SamFlags};
 use crate::readers::ReaderType;
+use crate::writers::WriterType;
 use crate::sequence::DnaSequence;
+
+// ============================================================================
+// FastqRecord <SingleRead> and <PairedRead> structs
+// ============================================================================
 
 pub trait FastqFormatter {
     fn format_id(id: &str) -> String;
@@ -38,10 +44,10 @@ impl FastqFormatter for Read2 {
 /// Struct representing an individual FASTQ read.
 #[derive(Debug, Clone)]
 pub struct FastqRecord<T: FastqFormatter> {
-    pub id: String,
-    pub seq: String,
+    pub id:   String,
+    pub seq:  String,
     pub qual: String,
-    _marker: PhantomData<T>,
+    _marker:  PhantomData<T>,
 }
 
 impl FastqRecord<SingleRead> {
@@ -117,16 +123,9 @@ impl PairedRead {
 }
 
 
-///
-/// WRITER
-/// 
-/// 1. Initialize your outputs.
-/// let r1_writer = WriterType::to_gz(&format!("{}.r1.fq.gz", fq_prefix))?;
-/// let r2_writer = WriterType::to_gz(&format!("{}.r2.fq.gz", fq_prefix))?;
-/// 
-// 2. Wrap them in the strict paired writer.
-/// let mut fastq_writer = PairedFastqWriter::new(r1_writer, r2_writer);
-/// 
+// ============================================================================
+// Writers
+// ============================================================================
 
 /// A writer for standard single-end FASTQ records.
 pub struct FastqWriter<W: Write> {
@@ -157,6 +156,23 @@ impl<W: Write> FastqWriter<W> {
     /// Consumes the FastqWriter, returning the underlying writer.
     pub fn into_inner(self) -> W {
         self.writer
+    }
+}
+
+impl FastqWriter<WriterType> {
+    /// Automatically detects file type based on extension.
+    pub fn create(path: &str) -> io::Result<Self> {
+        Ok(Self::new(WriterType::create(path)?))
+    }
+
+    /// Uses multi-threaded gzip for `.gz` files.
+    pub fn create_with_threads(path: &str, threads: usize) -> io::Result<Self> {
+        let writer: WriterType = if path.ends_with(".gz") {
+            WriterType::to_multithreaded_gz(path, threads)?
+        } else {
+            WriterType::create(path)?
+        };
+        Ok(Self::new(writer))
     }
 }
 
@@ -192,6 +208,20 @@ impl<W1: Write, W2: Write> PairedFastqWriter<W1, W2> {
     }
 }
 
+impl PairedFastqWriter<WriterType, WriterType> {
+    /// Automatically detects file type based on extension.
+    pub fn create(path1: &str, path2: &str) -> io::Result<Self> {
+        Ok(Self::new(WriterType::create(path1)?, WriterType::create(path2)?))
+    }
+
+    /// Uses multi-threaded gzip for `.gz` files.
+    pub fn create_with_threads(path1: &str, path2: &str, threads: usize) -> io::Result<Self> {
+        let w1: WriterType = if path1.ends_with(".gz") { WriterType::to_multithreaded_gz(path1, threads)? } else { WriterType::create(path1)? };
+        let w2: WriterType = if path2.ends_with(".gz") { WriterType::to_multithreaded_gz(path2, threads)? } else { WriterType::create(path2)? };
+        Ok(Self::new(w1, w2))
+    }
+}
+
 /// A writer for interleaved paired-end FASTQ records.
 pub struct InterleavedFastqWriter<W: Write> {
     pub writer: FastqWriter<W>,
@@ -222,15 +252,20 @@ impl<W: Write> InterleavedFastqWriter<W> {
     }
 }
 
-///
-/// READER
-/// 
-/// let paired_reader = PairedFastqReader::from_gzs("sample_R1.fq.gz", "sample_R2.fq.gz")?;
-/// 
-/// for pair in paired_reader {
-///     println!("Processing pair: {}", pair.r1.id);
-/// }
-/// 
+impl InterleavedFastqWriter<WriterType> {
+    pub fn create(path: &str) -> io::Result<Self> {
+        Ok(Self::new(WriterType::create(path)?))
+    }
+
+    pub fn create_with_threads(path: &str, threads: usize) -> io::Result<Self> {
+        let writer: WriterType = if path.ends_with(".gz") { WriterType::to_multithreaded_gz(path, threads)? } else { WriterType::create(path)? };
+        Ok(Self::new(writer))
+    }
+}
+
+// ============================================================================
+// Readers
+// ============================================================================
 
 /// A reader for parsing individual FASTQ records.
 pub struct FastqReader<R: BufRead, T> {
@@ -248,6 +283,15 @@ impl<R: BufRead, T> FastqReader<R, T> {
 }
 
 impl<T> FastqReader<ReaderType, T>{
+    /// Automatically detects file type based on extension.
+    pub fn open(path: &str) -> io::Result<Self> {
+        Ok(Self::new(ReaderType::open(path)?))
+    }
+
+    pub fn from_stdin() -> Self {
+        Self::new(ReaderType::from_stdin())
+    }
+
     pub fn from_file(path: &str) -> io::Result<Self> {
         Ok(Self::new(ReaderType::from_file(path)?))
     }
@@ -258,10 +302,6 @@ impl<T> FastqReader<ReaderType, T>{
 
     pub fn from_bz(path: &str) -> io::Result<Self> {
         Ok(Self::new(ReaderType::from_bz(path)?))
-    }
-
-    pub fn from_stdin() -> Self {
-        Self::new(ReaderType::from_stdin())
     }
 }
 
@@ -278,9 +318,9 @@ impl<R: BufRead, T: FastqFormatter> Iterator for FastqReader<R, T> {
             Err(e) => return Some(Err(e)),
         }
 
-        let mut seq = String::new();
-        let mut plus = String::new();
-        let mut qual = String::new();
+        let mut seq:  String = String::new();
+        let mut plus: String = String::new();
+        let mut qual: String = String::new();
 
         // 2. Read the next 3 lines. If any fail, it's an unexpected EOF/truncation.
         if let Err(e) = self.reader.read_line(&mut seq) { return Some(Err(e)); }
@@ -288,9 +328,9 @@ impl<R: BufRead, T: FastqFormatter> Iterator for FastqReader<R, T> {
         if let Err(e) = self.reader.read_line(&mut qual) { return Some(Err(e)); }
 
         // 3. Clean up the strings.
-        let id = id_line.trim_start_matches('@').trim_end().to_string();
-        let seq = seq.trim_end().to_string();
-        let qual = qual.trim_end().to_string();
+        let id:   String = id_line.trim_start_matches('@').trim_end().to_string();
+        let seq:  String = seq.trim_end().to_string();
+        let qual: String = qual.trim_end().to_string();
 
         // 4. Validate that the record wasn't truncated in the middle of a file.
         if seq.is_empty() || plus.is_empty() || qual.is_empty() {
@@ -321,24 +361,29 @@ impl<R1: BufRead, R2: BufRead> PairedFastqReader<R1, R2> {
 }
 
 impl PairedFastqReader<ReaderType, ReaderType> {
+    /// Opens two auto-detecting FASTQ streams.
+    pub fn open(path1: &str, path2: &str) -> io::Result<Self> {
+        Ok(Self::new(ReaderType::open(path1)?, ReaderType::open(path2)?))
+    }
+
     /// Opens two uncompressed FASTQ files and returns a paired reader.
     pub fn from_files(path1: &str, path2: &str) -> io::Result<Self> {
-        let r1 = ReaderType::from_file(path1)?;
-        let r2 = ReaderType::from_file(path2)?;
+        let r1: ReaderType = ReaderType::from_file(path1)?;
+        let r2: ReaderType = ReaderType::from_file(path2)?;
         Ok(Self::new(r1, r2))
     }
 
     /// Opens two gzipped FASTQ files and returns a paired reader.
     pub fn from_gzs(path1: &str, path2: &str) -> io::Result<Self> {
-        let r1 = ReaderType::from_gz(path1)?;
-        let r2 = ReaderType::from_gz(path2)?;
+        let r1: ReaderType = ReaderType::from_gz(path1)?;
+        let r2: ReaderType = ReaderType::from_gz(path2)?;
         Ok(Self::new(r1, r2))
     }
 
     /// Opens two bz2 compressed FASTQ files and returns a paired reader.
     pub fn from_bzs(path1: &str, path2: &str) -> io::Result<Self> {
-        let r1 = ReaderType::from_bz(path1)?;
-        let r2 = ReaderType::from_bz(path2)?;
+        let r1: ReaderType = ReaderType::from_bz(path1)?;
+        let r2: ReaderType = ReaderType::from_bz(path2)?;
         Ok(Self::new(r1, r2))
     }
 }
@@ -347,8 +392,8 @@ impl<R1: BufRead, R2: BufRead> Iterator for PairedFastqReader<R1, R2> {
     type Item = io::Result<PairedFastqRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let rec1 = self.r1_reader.next();
-        let rec2 = self.r2_reader.next();
+        let rec1: Option<Result<FastqRecord<Read1>, io::Error>> = self.r1_reader.next();
+        let rec2: Option<Result<FastqRecord<Read2>, io::Error>> = self.r2_reader.next();
 
         match (rec1, rec2) {
             // Both read successfully
@@ -384,6 +429,11 @@ impl<R: BufRead> InterleavedFastqReader<R> {
 
 // Convenience constructors using ReaderType
 impl InterleavedFastqReader<ReaderType> {
+    /// Automatically detects file type based on extension.
+    pub fn open(path: &str) -> io::Result<Self> {
+        Ok(Self::new(ReaderType::open(path)?))
+    }
+
     pub fn from_stdin() -> Self {
         Self::new(ReaderType::from_stdin())
     }
@@ -406,14 +456,14 @@ impl<R: BufRead> Iterator for InterleavedFastqReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Read the first record (R1)
-        let rec1 = match self.reader.next() {
+        let rec1: FastqRecord<SingleRead> = match self.reader.next() {
             Some(Ok(r)) => r,
             Some(Err(e)) => return Some(Err(e)),
             None => return None, // Clean EOF at the start of a pair
         };
 
         // Read the second record (R2)
-        let rec2 = match self.reader.next() {
+        let rec2: FastqRecord<SingleRead> = match self.reader.next() {
             Some(Ok(r)) => r,
             Some(Err(e)) => return Some(Err(e)),
             None => {
@@ -425,12 +475,16 @@ impl<R: BufRead> Iterator for InterleavedFastqReader<R> {
         };
 
         // Convert SingleReads to Read1 and Read2 to create PairedFastqRecord struct
-        let r1 = FastqRecord::<Read1>::new(rec1.id, rec1.seq, rec1.qual);
-        let r2 = FastqRecord::<Read2>::new(rec2.id, rec2.seq, rec2.qual);
+        let r1: FastqRecord<Read1> = FastqRecord::<Read1>::new(rec1.id, rec1.seq, rec1.qual);
+        let r2: FastqRecord<Read2> = FastqRecord::<Read2>::new(rec2.id, rec2.seq, rec2.qual);
 
         Some(Ok(PairedFastqRecord { r1, r2 }))
     }
 }
+
+// ============================================================================
+// Mate pairing HashMaps
+// ============================================================================
 
 /// MateMap - a struct for using a HashMap to collect mate pairs
 pub struct MateMap {
@@ -441,10 +495,10 @@ impl MateMap {
     pub fn new() -> Self { Self { pending: HashMap::new() } }
 
     pub fn process(&mut self, rec: PairedRead) -> Option<PairedFastqRecord> {
-        let qname = rec.id().to_string();
+        let qname: String = rec.id().to_string();
 
         if let Some(mate) = self.pending.remove(&qname) {
-            let pair = match (rec, mate) {
+            let pair: PairedFastqRecord = match (rec, mate) {
                 (PairedRead::R1(r1), PairedRead::R2(r2)) |
                 (PairedRead::R2(r2), PairedRead::R1(r1)) => {
                     PairedFastqRecord { r1, r2 }
@@ -474,14 +528,12 @@ pub struct ShardedMateMap {
 
 impl ShardedMateMap {
     /// Creates a new ShardedMateMap. 
-    /// `num_shards` should ideally be a power of 2 (e.g., 64 or 128)
-    /// to reduce lock contention across worker threads.
     /// A good rule of thumb is to set num_shards to at least 4x to 8x 
     /// the number of threads you plan to run. If you are using a 16-core machine, 
     /// 64 or 128 shards virtually guarantee that two threads will almost never 
     /// try to lock the exact same shard at the same time.
     pub fn new(num_shards: usize) -> Self {
-        let mut shards = Vec::with_capacity(num_shards);
+        let mut shards: Vec<Mutex<HashMap<String, PairedRead, std::hash::BuildHasherDefault<FxHasher>>>> = Vec::with_capacity(num_shards);
         for _ in 0..num_shards {
             // FxHashMap::default() uses the fast FxHasher automatically
             shards.push(Mutex::new(FxHashMap::default()));
@@ -493,21 +545,21 @@ impl ShardedMateMap {
     /// Determines which shard a given QNAME belongs to.
     #[inline]
     fn get_shard_index(&self, qname: &str) -> usize {
-        let mut hasher = FxHasher::default();
+        let mut hasher: FxHasher = FxHasher::default();
         qname.hash(&mut hasher);
         (hasher.finish() as usize) % self.num_shards
     }
 
     /// Processes a read safely across threads.
     pub fn process(&self, rec: PairedRead) -> Option<PairedFastqRecord> {
-        let shard_idx = self.get_shard_index(rec.id());
+        let shard_idx: usize = self.get_shard_index(rec.id());
 
         // 1. Lock the specific shard.
-        let mut shard = self.shards[shard_idx].lock().unwrap();
+        let mut shard: std::sync::MutexGuard<'_, HashMap<String, PairedRead, std::hash::BuildHasherDefault<FxHasher>>> = self.shards[shard_idx].lock().unwrap();
 
         // 2. Look up using the reference.
         if let Some(mate) = shard.remove(rec.id()) {
-            let pair = match (rec, mate) {
+            let pair: PairedFastqRecord = match (rec, mate) {
                 (PairedRead::R1(r1), PairedRead::R2(r2)) |
                 (PairedRead::R2(r2), PairedRead::R1(r1)) => {
                     PairedFastqRecord { r1, r2 }
@@ -521,14 +573,11 @@ impl ShardedMateMap {
             Some(pair)
         } else {
             // 3. Only allocate a String to insert it.
-            let qname_owned = rec.id().to_string();
+            let qname_owned: String = rec.id().to_string();
             shard.insert(qname_owned, rec);
             None
         }
     }
-
-    /// ToDo: fn delete_rec { get shard & shard.remove(rec.id()) }
-    /// ToDo: fn write_orphans { write all fastq recs to output }
 
     /// Safely aggregates the total orphan count across all shards.
     pub fn orphan_count(&self) -> usize {
@@ -536,5 +585,70 @@ impl ShardedMateMap {
             .iter()
             .map(|shard| shard.lock().unwrap().len())
             .sum()
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_formatters() {
+        assert_eq!(SingleRead::format_id("read1"), "read1");
+        assert_eq!(Read1::format_id("read1"), "read1/1");
+        assert_eq!(Read2::format_id("read1"), "read1/2");
+    }
+
+    #[test]
+    fn test_fastq_reader() {
+        // Mock a simple FASTQ file in memory
+        let fq_data = b"@read_A\nACGT\n+\n!!!!\n@read_B\nTGCA\n+\n####\n";
+        let cursor = Cursor::new(fq_data);
+        let mut reader = FastqReader::<_, SingleRead>::new(cursor);
+        
+        let rec1 = reader.next().unwrap().unwrap();
+        assert_eq!(rec1.id, "read_A");
+        assert_eq!(rec1.seq, "ACGT");
+        assert_eq!(rec1.qual, "!!!!");
+
+        let rec2 = reader.next().unwrap().unwrap();
+        assert_eq!(rec2.id, "read_B");
+        assert_eq!(rec2.seq, "TGCA");
+        assert_eq!(rec2.qual, "####");
+        
+        assert!(reader.next().is_none());
+    }
+
+    #[test]
+    fn test_truncated_fastq() {
+        let fq_data = b"@read_A\nACGT\n+\n"; // Missing qual line
+        let cursor = Cursor::new(fq_data);
+        let mut reader = FastqReader::<_, SingleRead>::new(cursor);
+        
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn test_mate_map() {
+        let mut map = MateMap::new();
+        let r1 = PairedRead::R1(FastqRecord::<Read1>::new("pair1".to_string(), "A".to_string(), "!".to_string()));
+        let r2 = PairedRead::R2(FastqRecord::<Read2>::new("pair1".to_string(), "C".to_string(), "!".to_string()));
+        
+        // Processing R1 first should cache it and return None
+        assert!(map.process(r1).is_none());
+        assert_eq!(map.orphan_count(), 1);
+        
+        // Processing R2 should find the match and return the pair
+        let pair = map.process(r2).unwrap();
+        assert_eq!(pair.r1.seq, "A");
+        assert_eq!(pair.r2.seq, "C");
+        assert_eq!(map.orphan_count(), 0);
     }
 }
