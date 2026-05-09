@@ -19,6 +19,19 @@ pub struct FastaRecord {
 }
 
 impl FastaRecord {
+    // let simple_record = FastaRecord::new("seq1", None, "GCTAGC");
+    pub fn new(
+        id:   impl Into<String>,
+        desc: impl Into<Option<String>>,
+        seq:  impl Into<String>,
+    ) -> Self {
+        Self {
+            id:     id.into(),
+            desc: desc.into(),
+            seq:   seq.into(),
+        }
+    }
+
     /// Helper to get the length of the sequence
     pub fn len(&self) -> usize {
         self.seq.len()

@@ -9,7 +9,6 @@ members = [
     "vref2db",
     "pfqbz2gz",
     "pfqsim",
-    "bvpg",
 ]
 
 [workspace.package]

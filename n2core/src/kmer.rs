@@ -124,7 +124,7 @@ impl KmerEncoding for [u8] {
 
 
 // ============================================================================
-// Kmer based orientor
+// Kmer based strand orientor
 // ============================================================================
 
 pub struct StrandOrientor {
@@ -147,8 +147,8 @@ impl StrandOrientor {
 
     /// Test a sequence and return it correctly oriented to the reference strand
     pub fn orient(&self, sequence: &[u8]) -> Result<Vec<u8>, KmerError> {
-        let mut fwd_hits = 0;
-        let mut rc_hits = 0;
+        let mut fwd_hits: i32 = 0;
+        let mut rc_hits: i32 = 0;
 
         let kmers = sequence.to_kmers(self.k)?;
 

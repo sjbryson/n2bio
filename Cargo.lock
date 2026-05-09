@@ -92,18 +92,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
-name = "bvpg"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap",
- "n2core",
- "petgraph",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
