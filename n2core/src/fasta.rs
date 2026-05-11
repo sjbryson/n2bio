@@ -201,19 +201,19 @@ mod tests {
 
     #[test]
     fn test_fasta_record_len_and_empty() {
-        let full_record: FastaRecord = FastaRecord {
-            id: "seq1".to_string(),
-            desc: None,
-            seq: "ACGTACGT".to_string(),
-        };
+        let full_record: FastaRecord = FastaRecord::new(
+            "seq1".to_string(),
+            None,
+            "ACGTACGT".to_string(),
+        );
         assert_eq!(full_record.len(), 8);
         assert!(!full_record.is_empty());
 
-        let empty_record: FastaRecord = FastaRecord {
-            id: "seq2".to_string(),
-            desc: Some("This is an empty sequence".to_string()),
-            seq: "".to_string(),
-        };
+        let empty_record: FastaRecord = FastaRecord::new(
+            "seq2".to_string(),
+            Some("This is an empty sequence".to_string()),
+            "".to_string(),
+        );
         assert_eq!(empty_record.len(), 0);
         assert!(empty_record.is_empty());
     }
