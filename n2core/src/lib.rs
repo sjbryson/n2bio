@@ -8,5 +8,5 @@ pub mod sam;
 pub mod fasta;
 pub mod sequence;
 pub mod kmer;
-pub mod graph;
+pub mod alignmentgraph;
 pub mod align;

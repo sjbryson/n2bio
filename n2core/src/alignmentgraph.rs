@@ -1,4 +1,4 @@
-//! n2core/src/graph.rs
+//! n2core/src/alignmentgraph.rs
 //!
 
 use std::collections::{HashMap};
