@@ -8,7 +8,8 @@ members = [
     "fastcov",
     "vref2db",
     "pfqbz2gz",
-    "pfqsim",
+    "bvgg",
+    "pfqsim", 
 ]
 
 [workspace.package]

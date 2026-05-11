@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use thiserror::Error;
 
+use crate::fasta::{ FastaRecord, FastaReader };
 use crate::kmer::{ KmerEncoding, StrandOrientor, KmerError };
 use crate::sequence::DnaSequence;
 use crate::align::{ EditOp, AlignmentScores, align_seqs, align_poa };
@@ -115,50 +116,50 @@ impl AlignmentGraph {
     ) -> Result<(), Box<dyn std::error::Error>> {
         
         let (oriented_query, matches) = self.map_query_anchors(query_seq, orientor, k)?;
-        let segments = self.get_unaligned_segments(&matches, k, oriented_query.len());
+        let segments: Vec<UnalignedSegment> = self.get_unaligned_segments(&matches, k, oriented_query.len());
         
         for seg in segments {
             match seg.segment_type {
                 SegmentType::Bounded { ref_node_start, ref_node_end } => {
-                    let query_slice = &oriented_query[seg.query_start..seg.query_end];
+                    let query_slice: &[u8] = &oriented_query[seg.query_start..seg.query_end];
                     
                     // 1. Extract the DAG bubble zone between the anchors
-                    let sorted_nodes = self.get_topological_subgraph(ref_node_start, ref_node_end);
+                    let sorted_nodes: Vec<usize> = self.get_topological_subgraph(ref_node_start, ref_node_end);
                     let (node_bases, predecessors) = self.build_poa_inputs(&sorted_nodes);
 
                     // 2. Align against the DAG using POA
                     let (ops, poa_path) = align_poa(query_slice, &node_bases, &predecessors, scores);
                     
                     // 3. Weave it back in
-                    let anchor_start_node = ref_node_start.saturating_sub(1);
+                    let anchor_start_node: usize = ref_node_start.saturating_sub(1);
                     self.weave_poa_alignment(&ops, &poa_path, &sorted_nodes, Some(anchor_start_node), Some(ref_node_end));
                 }
                 
                 // For extending flanks on linear genomes, we can safely fall back to standard 
                 // Needleman-Wunsch, as structural variation generally lives between anchors.
                 SegmentType::ExtendBackward { ref_node_end } => {
-                    let query_slice = &oriented_query[seg.query_start..seg.query_end];
+                    let query_slice: &[u8] = &oriented_query[seg.query_start..seg.query_end];
                     let ref_path: Vec<usize> = (0..ref_node_end).collect();
                     let ref_slice: Vec<u8> = ref_path.iter().filter_map(|&id| self.positions.get(&id).map(|n| n.nucleotide)).collect();
 
                     let rev_query: Vec<u8> = query_slice.iter().rev().copied().collect();
                     let rev_ref: Vec<u8> = ref_slice.iter().rev().copied().collect();
 
-                    let mut ops = align_seqs(&rev_ref, &rev_query, scores);
+                    let mut ops: Vec<EditOp> = align_seqs(&rev_ref, &rev_query, scores);
                     ops.reverse(); 
 
                     self.weave_alignment(&ops, &ref_path, None, Some(ref_node_end));
                 }
                 
                 SegmentType::ExtendForward { ref_node_start } => {
-                    let query_slice = &oriented_query[seg.query_start..seg.query_end];
+                    let query_slice: &[u8] = &oriented_query[seg.query_start..seg.query_end];
                     // Approximate extending to the end of the original backbone
-                    let last_node = self.positions.values().map(|n| n.id).max().unwrap_or(0);
+                    let last_node: usize = self.positions.values().map(|n| n.id).max().unwrap_or(0);
                     let ref_path: Vec<usize> = (ref_node_start..=last_node).collect();
                     let ref_slice: Vec<u8> = ref_path.iter().filter_map(|&id| self.positions.get(&id).map(|n| n.nucleotide)).collect();
 
-                    let ops = align_seqs(&ref_slice, query_slice, scores);
-                    let anchor_start_node = ref_node_start.saturating_sub(1);
+                    let ops: Vec<EditOp> = align_seqs(&ref_slice, query_slice, scores);
+                    let anchor_start_node: usize = ref_node_start.saturating_sub(1);
 
                     self.weave_alignment(&ops, &ref_path, Some(anchor_start_node), None);
                 }
@@ -301,22 +302,35 @@ impl AlignmentGraph {
 
         // 2. Bounded Segments
         for window in matches.windows(2) {
-            let m1: &AnchorMatch = &window[0];
-            let m2: &AnchorMatch = &window[1];
+            let m1 = &window[0];
+            let m2 = &window[1];
 
-            let q_start: usize = m1.query_position + k;
-            let q_end:   usize = m2.query_position;
+            // Cap q_start so it can never exceed q_end (handles overlapping query k-mers)
+            let q_end = m2.query_position;
+            let q_start = std::cmp::min(m1.query_position + k, q_end);
 
-            if q_start < q_end || (m1.reference_node_id + k) != m2.reference_node_id {
-                segments.push(UnalignedSegment {
-                    query_start: q_start,
-                    query_end: q_end,
-                    segment_type: SegmentType::Bounded {
-                        ref_node_start: m1.reference_node_id + k,
-                        ref_node_end: m2.reference_node_id,
-                    },
-                });
+            let ref_end = m2.reference_node_id;
+            let ref_start = m1.reference_node_id + k;
+
+            // If both gaps are effectively 0 (or perfectly overlapping), they are 
+            // part of the exact same contiguous block. Skip to avoid empty alignments.
+            if q_start == q_end && ref_start >= ref_end {
+                continue;
             }
+
+            // If the reference jumped backwards (Structural Variation / Translocation),
+            // safe_ref_start will cap at ref_end, yielding an empty reference gap.
+            // The pipeline will naturally insert the unaligned query bases and bridge the two distant nodes.
+            let safe_ref_start = std::cmp::min(ref_start, ref_end);
+
+            segments.push(UnalignedSegment {
+                query_start: q_start,
+                query_end: q_end,
+                segment_type: SegmentType::Bounded {
+                    ref_node_start: safe_ref_start,
+                    ref_node_end: ref_end,
+                },
+            });
         }
 
         // 3. 3' Flank
@@ -342,7 +356,7 @@ impl AlignmentGraph {
         let mut sorted_nodes: Vec<usize> = Vec::new();
 
         // 1. Discover all nodes in this subgraph and count their local in-degrees
-        // We use a basic BFS starting from `start_node`.
+        // Use a basic BFS starting from `start_node`.
         let mut to_visit: Vec<usize> = vec![start_node];
         let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
         visited.insert(start_node);
@@ -355,7 +369,7 @@ impl AlignmentGraph {
 
             if let Some(edges) = self.edges_out.get(&current) {
                 for edge in edges {
-                    let next_node = edge.to_node;
+                    let next_node: usize = edge.to_node;
                     
                     // Increment the in-degree for this local subgraph
                     *in_degrees.entry(next_node).or_insert(0) += 1;
@@ -381,7 +395,7 @@ impl AlignmentGraph {
 
             if let Some(edges) = self.edges_out.get(&current) {
                 for edge in edges {
-                    let next_node = edge.to_node;
+                    let next_node: usize = edge.to_node;
                     
                     if let Some(degree) = in_degrees.get_mut(&next_node) {
                         *degree -= 1;
@@ -418,9 +432,9 @@ impl AlignmentGraph {
                 EditOp::Match => {
                     let current_ref_node: usize = ref_path[ref_idx];
                     
-                    if let Some(prev) = last_query_node {
-                        self.add_edge(prev, Strand::Forward, current_ref_node, Strand::Forward, EdgeType::Match);
-                    }
+                    //if let Some(prev) = last_query_node {
+                    //    self.add_edge(prev, Strand::Forward, current_ref_node, Strand::Forward, EdgeType::Match);
+                    //}
                     
                     last_query_node = Some(current_ref_node);
                     ref_idx += 1;
@@ -457,7 +471,7 @@ impl AlignmentGraph {
         let mut predecessors: Vec<Vec<usize>> = vec![Vec::new(); sorted_nodes.len()];
         
         // Map real node IDs to their topological array index (j)
-        let mut node_to_idx = std::collections::HashMap::new();
+        let mut node_to_idx: HashMap<usize, usize> = std::collections::HashMap::new();
         for (i, &node_id) in sorted_nodes.iter().enumerate() {
             node_bases.push(self.positions.get(&node_id).expect("Node missing").nucleotide);
             node_to_idx.insert(node_id, i);
@@ -534,36 +548,48 @@ impl AlignmentGraph {
 
 impl AlignmentGraph {
     /// Full pipeline to initialize a reference graph and map a query genome onto it.
-    pub fn build_pangenome(
-        reference_seq: &[u8],
-        query_sequences: &[&[u8]], // A list of query genomes (e.g., from a parsed Multi-FASTA)
-        k: usize,
+    pub fn from_fastas(
+        reference_path: &str,
+        query_fasta: &str,
+        kmer_size: usize,
         is_circular: bool,
         export_path: &str,
     ) -> Result<AlignmentGraph, Box<dyn std::error::Error>> {
         
         println!("Initializing graph and adding reference backbone...");
         let mut graph: AlignmentGraph = AlignmentGraph::new(is_circular)?;
+
+        // Ingest the reference backbone
+        let ref_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(&reference_path)?;
+        let ref_record: FastaRecord = ref_reader.into_iter().next().expect("Reference file is empty")?;
+        let reference_seq: &[u8] = ref_record.seq.as_bytes();
         graph.add_reference(reference_seq);
 
-        println!("Building reference anchors (k={})...", k);
-        graph.build_reference_anchors(reference_seq, k)?;
+        println!("Building reference anchors (k={})...", kmer_size);
+        graph.build_reference_anchors(reference_seq, kmer_size)?;
 
         let orientor: StrandOrientor = StrandOrientor::new(reference_seq, 15)?;
         let scores: AlignmentScores  = AlignmentScores::default();
 
-        for (i, query_seq) in query_sequences.iter().enumerate() {
-            println!("Aligning Genome #{}...", i + 2); // Reference is #1
-            graph.add_genome(query_seq, k, &orientor, &scores)?;
+        // Add assemblies to the graph
+        let assembly_reader: FastaReader<crate::readers::ReaderType> = FastaReader::from_file(&query_fasta)?;
+        
+        for assembly_fasta in assembly_reader {
+            let record: FastaRecord = assembly_fasta?;
+            if !record.is_empty() {
+                let query_seq:&[u8] = record.seq.as_bytes();
+                graph.add_genome(query_seq, kmer_size, &orientor, &scores)?;
+            }
         }
-
+        
         println!("Exporting graph to {}...", export_path);
         graph.export_to_graphml(export_path)?;
 
         println!("Pangenome construction complete!");
         Ok(graph)
-    }
+        }
 }
+
 
 // ============================================================================
 // Alignment graph - IO
