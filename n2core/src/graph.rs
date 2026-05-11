@@ -14,10 +14,10 @@ use crate::align::{ EditOp, AlignmentScores, align_seqs, align_poa };
 // Errors
 // ============================================================================
 
-#[derive(Error, Debug, PartialEq)]
-pub enum GraphError {
+#[derive(Error, Debug)]
+pub enum AlignmentGraphError {
     #[error("error")]
-    GraphError(),
+    AlignmentGraphError(),
 }
 
 // ============================================================================
@@ -25,7 +25,7 @@ pub enum GraphError {
 // ============================================================================
 
 /// A bidirectional edge connecting two nodes in the sequence graph.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Edge {
     pub from_node:   usize,
     pub from_strand: Strand,
@@ -35,7 +35,7 @@ pub struct Edge {
 }
 
 /// Categorizes the biological meaning of an edge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum EdgeType {
     Backbone,  // The original reference genome sequence
     Match,     // Query genome matches the reference
@@ -60,7 +60,7 @@ pub struct AlignmentGraph {
 }
 
 impl AlignmentGraph {
-    pub fn new(circular: bool) -> Result<Self, GraphError> {
+    pub fn new(circular: bool) -> Result<Self, AlignmentGraphError> {
         Ok(AlignmentGraph {
             positions:    HashMap::new(),
             anchors:      HashMap::new(),
@@ -640,7 +640,7 @@ impl AlignmentGraph {
 // ============================================================================
 
 /// Represents the reading direction of a node.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Strand {
     Forward, // Reading 5' to 3'
     Reverse, // Reading 3' to 5' (requires reverse complementing the nucleotide)
@@ -657,7 +657,7 @@ impl Strand {
 }
 
 /// Represents a 1-to-1 anchor match between the query and the reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct AnchorMatch {
     pub query_position: usize,
     pub reference_node_id: usize,
@@ -666,7 +666,7 @@ pub struct AnchorMatch {
 #[derive(Debug, Clone)]
 pub struct ReferencePosition {
     pub id: usize,
-    pub position: usize, // Biological position (useful for VCF export later)
+    pub position: usize,
     pub nucleotide: u8,
 }
 
@@ -676,7 +676,7 @@ pub struct ReferenceAnchor {
     pub target_node_id: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum SegmentType {
     /// Bounded by two anchors. Aligned normally (left-to-right).
     Bounded { 
@@ -698,7 +698,7 @@ pub enum SegmentType {
 
 /// Represents a slice of the query genome that falls between two anchors
 /// and requires more granular alignment against the reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct UnalignedSegment {
     pub query_start: usize,
     pub query_end: usize,
