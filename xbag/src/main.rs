@@ -1,4 +1,4 @@
-//! n2bio/bvgg/src/main.rs
+//! n2bio/xbag/src/main.rs
 
 use clap::Parser;
 use std::process;

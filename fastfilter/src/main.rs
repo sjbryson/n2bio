@@ -20,37 +20,43 @@ struct Args {
     #[arg(short = 't', long, default_value_t = 4)]
     threads: usize,
 
-    /// Number of shards for the ShardedMateMap (recommend 4-8x threads)
-    #[arg(long, default_value_t = 64)]
+    /// Number of shards for the mate pairing hash map (recommend 4-8x threads, default = 32)
+    #[arg(long, default_value_t = 32)]
     shards: usize,
 
     /// Prefix for output files (e.g. 'out' -> out.r1.fq.gz, out.r2.fq.gz)
     #[arg(short = 'p', long, required = true)]
     fq_prefix: String,
+    
+    // make optional if --stdout interleaved or --interleaved (pe vs lr) options
+
+    /// Name of the run/sample for the JSON report -> creates {report}.json #########################################
+    //#[arg(short = 'r', long, required = true)]                              // ====== Update output logic ===========
+    //report: String,
 
     /// If none of the following optional max stats are set, only unmapped pairs are written.
-    /// Optional: Maximum Alignment Proportion - sam.calculate_alignment_proportion()
-    #[arg(long)]
+    /// Optional: Max Alignment Proportion - sam.calculate_alignment_proportion()
+    #[arg(long = "max-ap")]
     max_ap: Option<f32>,
     
-    /// Optional: Maximum Percent Identity - sam.calculate_alignment_accuracy()
-    #[arg(long)]
+    /// Optional: Max Percent Identity - sam.calculate_alignment_accuracy()
+    #[arg(long = "max-pi")]
     max_pi: Option<f32>,
     
-    /// Optional: Max AS score for filtering mapped reads - sam.get_int_tag("AS")
-    #[arg(long)]
+    /// Optional: Max Alignment Score - sam.get_int_tag("AS")
+    #[arg(long = "max-as")]
     max_as: Option<i32>,
 
-    /// Optional: Maximum Alignment Lenth - sam.calculate_alignment_length()
-    #[arg(long)]
+    /// Optional: Max Alignment Lenth - sam.calculate_alignment_length()
+    #[arg(long = "max-al")]
     max_al: Option<u32>,
     
-    /// Optional: Max AS/AL score for filtering mapped reads - sam.calculate_as_al()
-    #[arg(long)]
+    /// Optional: Max AS/AL score (avg. AS per covered base) - sam.calculate_as_al()
+    #[arg(long = "max-sl")]
     max_sl: Option<f32>,
 
-    /// Optional: Max MAPQ score for filtering mapped reads - sam.calculate_as_al()
-    #[arg(long)]
+    /// Optional: Max MAPQ score - sam.mapq()
+    #[arg(long = "max-mq")]
     max_mq: Option<u32>,
 }
 
@@ -116,7 +122,7 @@ fn main() -> io::Result<()> {
     });
 
     // Spawn worker threads.
-    let mut worker_handles = Vec::with_capacity(args.threads);
+    let mut worker_handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(args.threads);
     for _ in 0..args.threads {
         let rx: crossbeam::channel::Receiver<String> = line_rx.clone();
         let p_tx: crossbeam::channel::Sender<n2core::fastq::PairedFastqRecord> = pair_tx.clone();
@@ -137,7 +143,8 @@ fn main() -> io::Result<()> {
                         
                     // If the pair resolves - forward it to the FASTQ writer thread.
                     if let Some(pair) = map.process(paired_read) {
-                        let _ = p_tx.send(pair);
+                        let _ = p_tx.send(pair); 
+                        // Update logic here for "--stdout interleaved" feature
                     }
                 }
             }
@@ -158,6 +165,7 @@ fn main() -> io::Result<()> {
         if bytes == 0 { break; } // Clean EOF.
         let clean_line: String = line_buffer.trim_end().to_string();
         // Skip SAM header lines
+        // Need to update logic for "--stdout sam" feature
         if clean_line.starts_with('@') {
             line_buffer.clear();
             continue;
@@ -180,12 +188,13 @@ fn main() -> io::Result<()> {
     // Wait for writers to finish flushing to disk.
     let pairs_written: usize = fastq_writer_handle.join().unwrap().unwrap();
 
+    // Update to use write to file feature "--report {args.prefix}.filter_report.json"
     // Summary data.
     let duration: std::time::Duration = start_time.elapsed();
     let primary_reads: u64 = total_primary_reads.load(Ordering::Relaxed);
     let total_pairs: u64 = primary_reads / 2;
     
-    let summary = serde_json::json!({
+    let summary: serde_json::Value = serde_json::json!({
         "runtime_seconds": duration.as_secs_f64(),
         "total_pairs"    : total_pairs,
         "written_pairs"  : pairs_written,

@@ -297,10 +297,6 @@ impl SamRecord {
         self.seq.len()
     }
     
-    pub fn passes_mapq(&self, min_mapq: u32) -> bool {
-        self.mapq >= min_mapq
-    }
-    
     pub fn into_fastq<T: FastqFormatter>(self) -> FastqRecord<T> {
         let (final_seq, final_qual) = if self.is_revcomp() {
             let rc_seq: String = self.seq.reverse_complement();

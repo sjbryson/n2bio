@@ -432,9 +432,9 @@ impl AlignmentGraph {
                 EditOp::Match => {
                     let current_ref_node: usize = ref_path[ref_idx];
                     
-                    //if let Some(prev) = last_query_node {
-                    //    self.add_edge(prev, Strand::Forward, current_ref_node, Strand::Forward, EdgeType::Match);
-                    //}
+                    if let Some(prev) = last_query_node {
+                        self.add_edge(prev, Strand::Forward, current_ref_node, Strand::Forward, EdgeType::Match);
+                    }
                     
                     last_query_node = Some(current_ref_node);
                     ref_idx += 1;

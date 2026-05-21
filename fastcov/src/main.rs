@@ -21,9 +21,13 @@ struct Args {
     #[arg(short = 't', long, default_value_t = 4)]
     threads: usize,
 
-    /// Name of the run/sample for the JSON report
+    /// Name of the run/sample for the JSON report -> creates {run_name}.json
     #[arg(short = 'r', long, required = true)]
     run_name: String,
+
+     /// Optional path to an SQLite taxonomy database (see vref2db)
+    #[arg(long)]
+    db: Option<String>,
 
     /// Optional: Min Alignment Proportion - sam.calculate_alignment_proportion()
     #[arg(long)]
@@ -45,16 +49,12 @@ struct Args {
     #[arg(long)]
     min_sl: Option<f32>,
 
-    /// Optional: Min MAPQ score - sam.calculate_as_al()
+    /// Optional: Min MAPQ score - sam.mapq()
     #[arg(long)]
     min_mq: Option<u32>,
-
-    /// Optional path to an SQLite taxonomy database (see vref2db)
-    #[arg(long)]
-    db: Option<String>,
 }
 
-/// Filter logic for whether an alignment passes - aligned well in this use case.
+/// Filter logic for whether an alignment passes - i.e. aligned well in this use case.
 fn sam_filter(sam: &SamStr, args: &Args) -> bool {
    
     if sam.is_mapped() {
@@ -132,12 +132,12 @@ fn main() -> io::Result<()> {
     let passed_primary: Arc<AtomicU64>   = Arc::new(AtomicU64::new(0));
     let passed_secondary: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-    let (line_tx, line_rx) = bounded::<String>(10_000);
+    let (line_tx, line_rx)= bounded::<String>(10_000);
     let (hit_tx, hit_rx) = bounded::<PipelineMsg>(10_000);
 
-    // ---------------------------------------------------------
-    // AGGREGATOR THREAD: Collects Stats lock-free
-    // ---------------------------------------------------------
+    // ============================================================================
+    // AGGREGATOR THREAD: Collects Stats
+    // ============================================================================
     let aggregator_handle: thread::JoinHandle<HashMap<String, RefStats>> = thread::spawn(move || -> HashMap<String, RefStats> {
         let mut ref_map: HashMap<String, RefStats> = HashMap::new();
 
@@ -198,9 +198,9 @@ fn main() -> io::Result<()> {
         ref_map
     });
 
-    // ---------------------------------------------------------
+    // ============================================================================
     // WORKER THREADS: Parse & Filter
-    // ---------------------------------------------------------
+    // ============================================================================
     let mut worker_handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(args.threads);
     for _ in 0..args.threads {
         let rx: crossbeam::channel::Receiver<String>      = line_rx.clone();
@@ -240,9 +240,9 @@ fn main() -> io::Result<()> {
         worker_handles.push(handle);
     }
 
-    // ---------------------------------------------------------
+    // ============================================================================
     // MAIN THREAD: Tee off of input stream (Stdin -> Stdout + Workers)
-    // ---------------------------------------------------------
+    // ============================================================================
     let mut sam_reader: SamReader = SamReader::from_stdin();
     let mut stdout: io::StdoutLock<'_> = io::stdout().lock();
     let mut line_buffer: String = String::new();
@@ -280,9 +280,9 @@ fn main() -> io::Result<()> {
     for handle in worker_handles { handle.join().unwrap(); }
     let ref_map: HashMap<String, RefStats> = aggregator_handle.join().unwrap();
 
-    // ---------------------------------------------------------
+    // ============================================================================
     // JSON EXPORT
-    // ---------------------------------------------------------
+    // ============================================================================
     let mut num_refs_primary: u32 = 0;
     let mut num_refs_secondary: u32 = 0;
     let mut coverage_stats: Vec<serde_json::Value> = Vec::new();
