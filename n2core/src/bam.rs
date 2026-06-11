@@ -126,8 +126,8 @@ pub struct BamReader {
 }
 
 impl BamReader {
-    /// Smart open: Opens a BAM file utilizing the optimized ReaderType buffer
-    /// and seamlessly handles the BGZF decompression block routing.
+    /// Smart open: Opens a BAM file utilizing the ReaderType buffer
+    /// and handles the BGZF decompression block routing.
     pub fn open(path: &str) -> io::Result<Self> {
         let source: ReaderType = ReaderType::from_file(path)?;
         Ok(Self::new(source))
@@ -135,7 +135,6 @@ impl BamReader {
 
     /// Initializes a new BamReader from a given ReaderType
     pub fn new(source: ReaderType) -> Self {
-        // ReaderType is already heavily buffered; we pass it directly into the decoder.
         let bgzf_stream: MultiGzDecoder<ReaderType> = MultiGzDecoder::new(source);
         Self { bgzf_stream }
     }
@@ -186,7 +185,7 @@ impl BamReader {
         Ok(BamHeader { text, references })
     }
 
-    /// Reads the next record into the provided `BamRecord` struct.
+    /// Reads the next record into the `BamRecord` struct.
     /// Returns `Ok(true)` if a record was read, and `Ok(false)` on EOF.
     pub fn read_record(&mut self, record: &mut BamRecord) -> io::Result<bool> {
         let block_size: i32 = match self.bgzf_stream.read_i32::<LittleEndian>() {
@@ -251,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_decoded_sequence_even_length() {
-        let mut record = BamRecord::default();
+        let mut record: BamRecord = BamRecord::default();
         // Construct the expected sequence "ACGT"
         // A=1, C=2  => (1 << 4) | 2 = 18 (0x12)
         // G=4, T=8  => (4 << 4) | 8 = 72 (0x48)
@@ -264,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_decoded_sequence_odd_length() {
-        let mut record = BamRecord::default();
+        let mut record: BamRecord = BamRecord::default();
         // Construct the expected sequence "ACG"
         // A=1, C=2  => (1 << 4) | 2 = 18 (0x12)
         // G=4, N=15 => (4 << 4) | 15 = 79 (0x4F) -> The 'N' is a padded ignored byte
