@@ -5,6 +5,7 @@ pub mod readers;
 pub mod writers;
 pub mod fastq;
 pub mod sam;
+pub mod bam;
 pub mod fasta;
 pub mod sequence;
 pub mod kmer;
