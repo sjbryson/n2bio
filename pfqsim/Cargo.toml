@@ -1,0 +1,28 @@
+[package]
+name = "pfqsim"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+
+[dependencies]
+# n2core
+n2core = { path = "../n2core" }
+
+# CLI Parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Concurrency and Channels
+rayon = "1.8"
+crossbeam-channel = "0.5"
+
+# Random Number Generation
+rand = { version = "0.10" }
+rand_distr = "0.6"
+
+# Compression
+flate2 = "1.0"
+
+# Serialization/Deserialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

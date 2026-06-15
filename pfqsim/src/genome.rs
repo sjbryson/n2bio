@@ -1,0 +1,98 @@
+//! n2bio/pfqsim/src/genome.rs
+//! 
+
+use std::io::{ self, Error, ErrorKind };
+use rand::RngExt; 
+use rand::distr::{ Distribution, weighted::WeightedIndex };
+
+use n2core::fasta::{ FastaReader, FastaRecord };
+use n2core::readers::ReaderType;
+
+// ============================================================================
+// Contig
+// ============================================================================
+
+pub struct Contig {
+    pub id: String,
+    pub seq: Vec<u8>, 
+}
+
+// ============================================================================
+// Reference genome
+// ============================================================================
+
+pub struct ReferenceGenome {
+    pub contigs: Vec<Contig>,
+    pub selector: WeightedIndex<usize>,
+}
+
+impl ReferenceGenome {
+    /// Loads the FASTA, handles circularity, splits at 'N's, and builds weights
+    pub fn load(
+        reader: FastaReader<ReaderType>, 
+        min_length: usize, 
+        is_circular: bool,
+    ) -> io::Result<Self> {
+        let mut contigs: Vec<Contig> = Vec::new();
+        let mut weights: Vec<usize> = Vec::new();
+        let mut total_bases: usize = 0;
+
+        for record_result in reader {
+            let record: FastaRecord = record_result?;
+            let mut raw_seq: Vec<u8> = record.seq.into_bytes();
+
+            // 1. Handle Circularity BEFORE splitting
+            if is_circular && raw_seq.len() >= min_length {
+                let bridge = raw_seq[0..min_length].to_vec();
+                raw_seq.extend(bridge);
+            }
+
+            // 2. Split by 'N' or 'n' to completely eradicate them from the sampling pool
+            for chunk in raw_seq.split(|&b| b == b'N' || b == b'n') {
+                let seq_len = chunk.len();
+
+                if seq_len >= min_length {
+                    total_bases += seq_len;
+                    contigs.push(Contig {
+                        id: record.id.clone(), 
+                        seq: chunk.to_vec(),
+                    });
+                    weights.push(seq_len);
+                }
+            }
+        }
+
+        if contigs.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("No sequences (or 'N'-free chunks) are >= {} bp.", min_length),
+            ));
+        }
+
+        println!("Loaded {} valid contig chunks ({} clean bases total)", contigs.len(), total_bases);
+
+       
+        let selector = WeightedIndex::new(weights)
+            .map_err(|_| Error::new(ErrorKind::Other, "Failed to build weighted index"))?;
+
+        Ok(Self { contigs, selector })
+    }
+
+    /// Randomly selects a contig (weighted by length) and returns the ID and a raw byte slice
+    pub fn sample_slice<'a, R: rand::Rng + ?Sized>(
+        &'a self,
+        rng: &mut R,
+        insert_size: usize,
+        buffer_size: usize,
+    ) -> (&'a str, &'a [u8]) {
+        // Sample a slice from distribution using rng
+        let contig_idx = self.selector.sample(rng);
+        let contig = &self.contigs[contig_idx];
+        let slice_length = insert_size + buffer_size;
+        let max_start = contig.seq.len().saturating_sub(slice_length);
+        let start_pos = if max_start == 0 { 0 } else { rng.random_range(0..=max_start) };
+        let slice_end = std::cmp::min(start_pos + slice_length, contig.seq.len());
+
+        (&contig.id, &contig.seq[start_pos..slice_end])
+    }
+}

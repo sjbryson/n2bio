@@ -8,6 +8,7 @@ members = [
     "fastcov",
     "vref2db",
     "pfqbz2gz",
+    "pfqsim",
     "xbag",
 ]
 
