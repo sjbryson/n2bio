@@ -106,11 +106,17 @@ pub struct ComposeArgs {
 #[derive(Args)]
 pub struct AnalyzeArgs {
     
-    /// Name for the BAM file for analyzing
+    /// Path to a TSV config file 
+    #[arg(short = 'c', long)]
+    pub config: PathBuf,
+
+    /// Name of the BAM file for analyzing
     #[arg(short = 'b', long)]
     pub bam: PathBuf,
 
     /// Name for the analysis report
     #[arg(short = 'o', long)]
     pub output: PathBuf,
+
+    // ToDo: option for stdin sam input
 }

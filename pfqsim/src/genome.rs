@@ -34,22 +34,22 @@ impl ReferenceGenome {
         is_circular: bool,
     ) -> io::Result<Self> {
         let mut contigs: Vec<Contig> = Vec::new();
-        let mut weights: Vec<usize> = Vec::new();
-        let mut total_bases: usize = 0;
+        let mut weights: Vec<usize>  = Vec::new();
+        let mut total_bases: usize   = 0;
 
         for record_result in reader {
-            let record: FastaRecord = record_result?;
+            let record: FastaRecord  = record_result?;
             let mut raw_seq: Vec<u8> = record.seq.into_bytes();
 
             // 1. Handle Circularity BEFORE splitting
             if is_circular && raw_seq.len() >= min_length {
-                let bridge = raw_seq[0..min_length].to_vec();
+                let bridge: Vec<u8> = raw_seq[0..min_length].to_vec();
                 raw_seq.extend(bridge);
             }
 
-            // 2. Split by 'N' or 'n' to completely eradicate them from the sampling pool
+            // 2. Split by 'N' or 'n' to remove from the sampling pool
             for chunk in raw_seq.split(|&b| b == b'N' || b == b'n') {
-                let seq_len = chunk.len();
+                let seq_len: usize = chunk.len();
 
                 if seq_len >= min_length {
                     total_bases += seq_len;
@@ -72,7 +72,7 @@ impl ReferenceGenome {
         println!("Loaded {} valid contig chunks ({} clean bases total)", contigs.len(), total_bases);
 
        
-        let selector = WeightedIndex::new(weights)
+        let selector: WeightedIndex<usize> = WeightedIndex::new(weights)
             .map_err(|_| Error::new(ErrorKind::Other, "Failed to build weighted index"))?;
 
         Ok(Self { contigs, selector })
@@ -86,12 +86,12 @@ impl ReferenceGenome {
         buffer_size: usize,
     ) -> (&'a str, &'a [u8]) {
         // Sample a slice from distribution using rng
-        let contig_idx = self.selector.sample(rng);
-        let contig = &self.contigs[contig_idx];
-        let slice_length = insert_size + buffer_size;
-        let max_start = contig.seq.len().saturating_sub(slice_length);
-        let start_pos = if max_start == 0 { 0 } else { rng.random_range(0..=max_start) };
-        let slice_end = std::cmp::min(start_pos + slice_length, contig.seq.len());
+        let contig_idx: usize   = self.selector.sample(rng);
+        let contig: &Contig     = &self.contigs[contig_idx];
+        let slice_length: usize = insert_size + buffer_size;
+        let max_start: usize    = contig.seq.len().saturating_sub(slice_length);
+        let start_pos: usize    = if max_start == 0 { 0 } else { rng.random_range(0..=max_start) };
+        let slice_end: usize    = std::cmp::min(start_pos + slice_length, contig.seq.len());
 
         (&contig.id, &contig.seq[start_pos..slice_end])
     }

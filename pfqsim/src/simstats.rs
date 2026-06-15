@@ -43,7 +43,7 @@ impl NormalDistParams {
             variance_sum += (count as f64) * diff * diff;
         }
         
-        let std_dev = if total_count > 1 {
+        let std_dev: f64 = if total_count > 1 {
             (variance_sum / n_f64).sqrt()
         } else {
             0.0

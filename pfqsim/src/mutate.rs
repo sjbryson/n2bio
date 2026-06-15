@@ -32,7 +32,7 @@ impl Mutator {
         }
     }
 
-    /// Mutates a raw reference slice in a single pass, guaranteeing exact `target_length`.
+    /// Mutates a raw reference slice in a single pass
     pub fn mutate(
         &self,
         ref_slice: &[u8],
@@ -74,7 +74,7 @@ impl Mutator {
             ref_idx += 1;
         }
 
-        // Fallback: Pad with 'N's if severe deletions exhausted our buffer
+        // Fallback: Pad with 'N's if severe deletions exhausted the buffer
         while sequence.len() < target_length {
             sequence.push(b'N');
         }
@@ -103,7 +103,7 @@ fn random_base(rng: &mut SmallRng) -> u8 {
 fn random_mutated_base(rng: &mut SmallRng, original: u8) -> u8 {
     loop {
         let new_base = random_base(rng);
-        // Compare case-insensitively just in case the FASTA was lowercase
+        // Compare case in case FASTA was lowercase
         if new_base.to_ascii_uppercase() != original.to_ascii_uppercase() {
             return new_base;
         }
