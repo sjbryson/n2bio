@@ -131,4 +131,53 @@ Options:
 
 ---
 
-**pfqsim/** - ToDo: build a tool to rapidly generate synthetic sequencing reads for a genome.
+**pfqsim/** - Tool to generate synthetic sequencing libraries.
+
+```
+Fast metagenomic read simulator
+
+Usage: pfqsim <COMMAND>
+
+Commands:
+  model     Build insert size and Q-score distributions from a BAM file
+  generate  Generate a simulated paired-read library from a reference FASTA
+  compose   Compose a final metagenomic library based on an abundance config
+  analyze   Analyze alignments from stdin sam or a bam file
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+- **pfqsim model** - Build insert size and Q-score distributions from a BAM file
+```
+Usage: pfqsim model [OPTIONS] --bam <BAM> --output <OUTPUT>
+
+Options:
+  -b, --bam <BAM>        Name for the BAM file for modeling insert size and Qscore distributions
+  -o, --output <OUTPUT>  Name for the JSON model report -> creates {output}.json
+  -l, --length <LENGTH>  Read length to model [default: 150]
+  -q, --mapq <MAPQ>      Optional: Min MAPQ score for filtering alignments for insert size distribution [default: 40]
+  -h, --help             Print help
+```
+- **pfqsim generate** - 
+```
+Usage: pfqsim generate [OPTIONS] --model <MODEL> --fasta <FASTA> --sub-rate <SUB_RATE> --indel-rate <INDEL_RATE> --num-reads <NUM_READS> --genome-code <GENOME_CODE> --prefix <PREFIX> --threads <THREADS>
+
+Options:
+  -m, --model <MODEL>              Path to the JSON model report -> created by pfqsim --model
+  -f, --fasta <FASTA>              Path to the fasta file to generate reads from
+  -c, --circular                   Boolean value: circular genome
+  -s, --sub-rate <SUB_RATE>        Float value for random substitution rate to apply to simulated reads
+  -i, --indel-rate <INDEL_RATE>    Float value for random insertion and deletion rate to apply to simulated reads
+  -n, --num-reads <NUM_READS>      Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
+  -l, --length <LENGTH>            Read length to model (default = 150) [default: 150]
+  -g, --genome-code <GENOME_CODE>  Genome code for fastq headers
+  -p, --prefix <PREFIX>            Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
+  -t, --threads <THREADS>          Number of worker threads
+  -h, --help                       Print help
+  ```
+  - **pfqsim compose** - ToDo:
+
+  - **pfqsim analyze** - ToDo:
