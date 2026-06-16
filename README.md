@@ -150,7 +150,8 @@ Options:
   -V, --version  Print version
 ```
 
-- **pfqsim model** - Build insert size and Q-score distributions from a BAM file
+- **pfqsim model** - Build insert size and Q-score distributions from a name sorted BAM file. Make sure the bam was name sorted e.g. samtools sort -n -o name_sorted.bam -
+
 ```
 Usage: pfqsim model [OPTIONS] --bam <BAM> --output <OUTPUT>
 
@@ -173,7 +174,7 @@ Options:
   -i, --indel-rate <INDEL_RATE>    Float value for random insertion and deletion rate to apply to simulated reads
   -n, --num-reads <NUM_READS>      Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
   -l, --length <LENGTH>            Read length to model (default = 150) [default: 150]
-  -g, --genome-code <GENOME_CODE>  Genome code for fastq headers
+  -g, --genome-code <GENOME_CODE>  Genome code for fastq headers (E.g. CHM13, HG38, etc. -> @CHM13:{Accession}:...)
   -p, --prefix <PREFIX>            Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
   -t, --threads <THREADS>          Number of worker threads
   -h, --help                       Print help

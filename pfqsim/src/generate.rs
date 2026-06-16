@@ -28,7 +28,7 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
     println!("Generating {} reads from {:?}", args.num_reads, args.fasta);
 
     let read_length: usize = args.length; 
-    let deletion_buffer: usize = 40; 
+    let deletion_buffer: usize = 20; 
     
     // Assume a max insert size of ~1000, plus the buffer
     let min_required_length: usize = 1000 + deletion_buffer;
@@ -99,7 +99,7 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             let global_read_id: usize = start_read_id + local_i;
 
             // A. Sample an insert size
-            let insert_size = inserts.sample(&mut rng);
+            let insert_size: usize = std::cmp::max(inserts.sample(&mut rng), read_length + deletion_buffer);
 
             // B. Grab a slice of the genome equal to the INSERT SIZE
             let (accession, raw_insert_slice) = reference.sample_slice(&mut rng, insert_size, deletion_buffer);
@@ -115,17 +115,17 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
             // E. Format headers
-            let r1_base_id: String = format!("@{}:{}:{}:{}:{}:{} 1:N:0:0", 
+            let r1_base_id: String = format!("{}:{}:{}:{}:{}:{} 1:N:0:0", 
                 args.genome_code, accession, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, global_read_id
             );
 
-            let r2_base_id: String = format!("@{}:{}:{}:{}:{}:{} 2:N:0:0", 
+            let r2_base_id: String = format!("{}:{}:{}:{}:{}:{} 2:N:0:0", 
                 args.genome_code, accession, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, global_read_id
             );
 
             // F. Generate qualities
-            let r1_qual = qualities.generate(&mut rng, read_length, 1);
-            let r2_qual = qualities.generate(&mut rng, read_length, 2);
+            let r1_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 1);
+            let r2_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 2);
 
             // G. Convert Vec<u8> buffers to Strings
             let (r1_seq_str, r1_qual_str, r2_seq_str, r2_qual_str) = unsafe {

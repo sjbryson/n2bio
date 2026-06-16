@@ -68,15 +68,20 @@ impl Mutator {
                 sequence.push(random_mutated_base(rng, current_base));
                 subs += 1;
             } else {
-                sequence.push(current_base);
+                // Force soft-masked lowercase reference sequence to uppercase
+                sequence.push(current_base.to_ascii_uppercase());
             }
 
             ref_idx += 1;
         }
 
         // Fallback: Pad with 'N's if severe deletions exhausted the buffer
+        //while sequence.len() < target_length {
+        //    sequence.push(b'N');
+        
+        // Fallback: pad with random nucleotide
         while sequence.len() < target_length {
-            sequence.push(b'N');
+            sequence.push(random_base(rng));
         }
 
         MutationStats {
