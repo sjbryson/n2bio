@@ -16,7 +16,7 @@ use n2core::bam::{ BamReader, BamHeader, BamRecord, BamStats };
 // ============================================================================
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "BAM Alignment Stats Extractor")]
+#[command(author, version, about = "BAM Alignment Stats")]
 struct Args {
     /// Input name-sorted BAM file
     #[arg(short = 'b', long)]
@@ -27,11 +27,11 @@ struct Args {
     report: PathBuf,
 
     /// Generate histogram plots
-    #[arg(short = 'p', long)]
+    #[arg(long)]
     plot: bool,
 
     /// Generate html plots
-    #[arg(short = 'h', long)]
+    #[arg(long)]
     html: bool,
 
     /// Minimum MAPQ score for insert size calculation
@@ -144,7 +144,7 @@ struct StatsAccumulator {
 }
 
 // ============================================================================
-// Report
+// Report configuration
 // ============================================================================
 
 struct ReportConfig {
@@ -375,6 +375,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
     std::fs::write(html_path, html_content)?;
     Ok(())
 }
+
 // ============================================================================
 // Plot histogram
 // ============================================================================
