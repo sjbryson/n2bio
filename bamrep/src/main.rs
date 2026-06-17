@@ -198,17 +198,43 @@ impl ReportConfig {
 // ============================================================================
 
 fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let mut html_path: PathBuf = report_path.clone();
+    let mut html_path = report_path.clone();
     html_path.set_extension("html");
-    
+
     let json_data: String = serde_json::to_string(results)?;
 
-    // Helper to format the summary table
-    let get_table_html = |name: &str| {
+    // Helper to format the top single-column table (Insert Size)
+    let get_single_table = |name: &str| {
         let s: &StatSummary = results.get(name).unwrap();
         format!(
-            "<table><tr><td>Count</td><td>{:.0}</td></tr><tr><td>Mean</td><td>{:.2}</td></tr><tr><td>Median</td><td>{:.2}</td></tr><tr><td>StdDev</td><td>{:.2}</td></tr></table>",
-            s.count, s.mean, s.median, s.stdev
+            r#"<table>
+                <tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Count</td><td>{:.0}</td></tr>
+                <tr><td>Mean</td><td>{:.2}</td></tr>
+                <tr><td>Median</td><td>{:.2}</td></tr>
+                <tr><td>StdDev</td><td>{:.2}</td></tr>
+                <tr><td>Min</td><td>{:.2}</td></tr>
+                <tr><td>Max</td><td>{:.2}</td></tr>
+            </table>"#,
+            s.count, s.mean, s.median, s.stdev, s.min, s.max
+        )
+    };
+
+    // Helper to format the combined R1/R2 tables
+    let get_combined_table = |r1_name: &str, r2_name: &str| {
+        let r1: &StatSummary = results.get(r1_name).unwrap();
+        let r2: &StatSummary = results.get(r2_name).unwrap();
+        format!(
+            r#"<table>
+                <tr><th>Metric</th><th>R1</th><th>R2</th></tr>
+                <tr><td>Count</td><td>{:.0}</td><td>{:.0}</td></tr>
+                <tr><td>Mean</td><td>{:.2}</td><td>{:.2}</td></tr>
+                <tr><td>Median</td><td>{:.2}</td><td>{:.2}</td></tr>
+                <tr><td>StdDev</td><td>{:.2}</td><td>{:.2}</td></tr>
+                <tr><td>Min</td><td>{:.2}</td><td>{:.2}</td></tr>
+                <tr><td>Max</td><td>{:.2}</td><td>{:.2}</td></tr>
+            </table>"#,
+            r1.count, r2.count, r1.mean, r2.mean, r1.median, r2.median, r1.stdev, r2.stdev, r1.min, r2.min, r1.max, r2.max
         )
     };
 
@@ -216,56 +242,139 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <title>BAM Alignment Report</title>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <style>
-        .grid-container {{ display: grid; grid-template-columns: 1fr 200px 1fr; gap: 10px; align-items: center; }}
-        table {{ font-size: 12px; border: 1px solid #ccc; width: 100%; }}
-        h1 {{ text-align: center; }}
+        body {{ font-family: sans-serif; background-color: #f9f9f9; margin: 0; padding: 20px; }}
+        .report-container {{ max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+        
+        h1 {{ text-align: center; margin-bottom: 40px; }}
+        
+        /* Centered horizontal divider with text */
+        .divider {{ display: flex; align-items: center; text-align: center; margin: 50px 0 20px 0; font-size: 1.2em; font-weight: bold; color: #444; }}
+        .divider::before, .divider::after {{ content: ''; flex: 1; border-bottom: 2px solid #eee; }}
+        .divider:not(:empty)::before {{ margin-right: 15px; }}
+        .divider:not(:empty)::after {{ margin-left: 15px; }}
+
+        /* CSS Grid Layouts */
+        .grid-top {{ display: grid; grid-template-columns: 80% 20%; gap: 10px; align-items: center; margin-bottom: 20px; }}
+        /* 2fr 1fr 2fr creates a 40% 20% 40% distribution */
+        .grid-row {{ display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 15px; align-items: center; margin-bottom: 20px; }}
+        
+        /* Table Styling */
+        table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: right; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; }}
+        th {{ background-color: #f4f4f4; text-align: center; font-weight: bold; }}
+        tr:nth-child(even) {{ background-color: #fafafa; }}
+        td:first-child {{ text-align: left; font-weight: bold; }}
     </style>
 </head>
 <body>
-    <h1>BAM Alignment Report</h1>
-    <div id="insert-size-plot"></div>
-    
-    <div class="grid-container">
-        <div id="r1_mapq"></div> {table1} <div id="r2_mapq"></div>
-        <div id="r1_as_al"></div> {table2} <div id="r2_as_al"></div>
-        <div id="r1_align_length"></div> {table3} <div id="r2_align_length"></div>
-        <div id="r1_align_proportion"></div> {table4} <div id="r2_align_proportion"></div>
+    <div class="report-container">
+        <h1>BAM Alignment Report</h1>
+
+        <div class="divider">PE Insert Sizes</div>
+        <div class="grid-top">
+            <div id="pe_insert_size_plot"></div>
+            {table_insert}
+        </div>
+
+        <div class="divider">MAPQ Distribution</div>
+        <div class="grid-row">
+            <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
+        </div>
+
+        <div class="divider">Alignment Scores (AS)</div>
+        <div class="grid-row">
+            <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
+        </div>
+
+        <div class="divider">Alignment Lengths (AL)</div>
+        <div class="grid-row">
+            <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
+        </div>
+
+        <div class="divider">AS per Base</div>
+        <div class="grid-row">
+            <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
+        </div>
+
+        <div class="divider">Alignment Proportions (AP)</div>
+        <div class="grid-row">
+            <div id="r1_align_proportion"></div> {table_ap} <div id="r2_align_proportion"></div>
+        </div>
+
+        <div class="divider">Alignment Percent Identity (PI)</div>
+        <div class="grid-row">
+            <div id="r1_align_accuracy"></div> {table_acc} <div id="r2_align_accuracy"></div>
+        </div>
     </div>
 
     <script>
         const data = {json_data};
         
-        function draw(id, name) {{
-            const s = data[name];
+        function draw(id, data_key, plot_title) {{
+            const s = data[data_key];
             const trace = {{
                 x: s.histogram.counts.map((_, i) => s.histogram.bin_min + (i * s.histogram.bin_size)),
-                y: s.histogram.counts, type: 'bar', name: name
+                y: s.histogram.counts, 
+                type: 'bar', 
+                name: plot_title,
+                marker: {{ 
+                    color: 'rgb(218, 235, 254)', 
+                    line: {{ color: 'rgb(160, 184, 206)', width: 1 }} // Added a slight border for crispness
+                }}
             }};
-            Plotly.newPlot(id, [trace], {{ title: name, margin: {{t:30, b:30}} }});
+            Plotly.newPlot(id, [trace], {{ 
+                title: plot_title, 
+                margin: {{t:40, b:40, l:50, r:20}} 
+            }});
         }}
 
-        draw('insert-size-plot', 'pe_insert_size');
-        draw('r1_mapq', 'r1_mapq'); draw('r2_mapq', 'r2_mapq');
-        draw('r1_as_al', 'r1_as_al'); draw('r2_as_al', 'r2_as_al');
-        draw('r1_align_length', 'r1_align_length'); draw('r2_align_length', 'r2_align_length');
-        draw('r1_align_proportion', 'r1_align_proportion'); draw('r2_align_proportion', 'r2_align_proportion');
+        // Draw Insert Size
+        draw('pe_insert_size_plot', 'pe_insert_size', 'PE Insert Sizes');
+
+        // Draw MAPQ
+        draw('r1_mapq', 'r1_mapq', 'R1 MAPQ Distribution');
+        draw('r2_mapq', 'r2_mapq', 'R2 MAPQ Distribution');
+
+        // Draw Align Score
+        draw('r1_align_score', 'r1_align_score', 'R1 Alignment Scores (AS)');
+        draw('r2_align_score', 'r2_align_score', 'R2 Alignment Scores (AS)');
+
+        // Draw Align Length
+        draw('r1_align_length', 'r1_align_length', 'R1 Alignment Lengths (AL)');
+        draw('r2_align_length', 'r2_align_length', 'R2 Alignment Lengths (AL)');
+
+        // Draw AS per Base
+        draw('r1_as_al', 'r1_as_al', 'R1 AS per Base');
+        draw('r2_as_al', 'r2_as_al', 'R2 AS per Base');
+
+        // Draw Align Proportion
+        draw('r1_align_proportion', 'r1_align_proportion', 'R1 Alignment Proportions (AP)');
+        draw('r2_align_proportion', 'r2_align_proportion', 'R2 Alignment Proportions (AP)');
+
+        // Draw Align Accuracy (PI)
+        draw('r1_align_accuracy', 'r1_align_accuracy', 'R1 Alignment Percent Identity (PI)');
+        draw('r2_align_accuracy', 'r2_align_accuracy', 'R2 Alignment Percent Identity (PI)');
     </script>
 </body>
 </html>
 "#, 
     json_data = json_data,
-    table1 = get_table_html("r1_mapq"), // simplified for example
-    table2 = get_table_html("r1_as_al"),
-    table3 = get_table_html("r1_align_length"),
-    table4 = get_table_html("r1_align_proportion")
+    table_insert = get_single_table("pe_insert_size"),
+    table_mapq = get_combined_table("r1_mapq", "r2_mapq"),
+    table_as = get_combined_table("r1_align_score", "r2_align_score"),
+    table_al = get_combined_table("r1_align_length", "r2_align_length"),
+    table_asal = get_combined_table("r1_as_al", "r2_as_al"),
+    table_ap = get_combined_table("r1_align_proportion", "r2_align_proportion"),
+    table_acc = get_combined_table("r1_align_accuracy", "r2_align_accuracy")
     );
 
     std::fs::write(html_path, html_content)?;
     Ok(())
 }
-
 // ============================================================================
 // Plot histogram
 // ============================================================================
