@@ -122,12 +122,13 @@ Usage: bamrep [OPTIONS] --bam <BAM> --report <REPORT>
 Options:
   -b, --bam <BAM>            Input name-sorted BAM file
   -r, --report <REPORT>      Output JSON report file
-      --plot                 Generate histogram plots
       --html                 Generate html plots
+      --plot                 Generate svg plots
   -q, --min-mapq <MIN_MAPQ>  Minimum MAPQ score for insert size calculation [default: 40]
   -i, --max-ins <MAX_INS>    Max insert size to use for summary stats calculation [default: 1000]
   -h, --help                 Print help
   -V, --version              Print version
+
 ```
 
 ---

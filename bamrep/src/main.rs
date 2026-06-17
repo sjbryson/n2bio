@@ -26,13 +26,13 @@ struct Args {
     #[arg(short = 'r', long)]
     report: PathBuf,
 
-    /// Generate histogram plots
-    #[arg(long)]
-    plot: bool,
-
     /// Generate html plots
     #[arg(long)]
     html: bool,
+
+    /// Generate svg plots
+    #[arg(long)]
+    plot: bool,
 
     /// Minimum MAPQ score for insert size calculation
     #[arg(short = 'q', long, default_value_t = 40)]
