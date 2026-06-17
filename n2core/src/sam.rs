@@ -190,7 +190,7 @@ impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
             return Ok(None);
         }
         
-        let matches = align_len.saturating_sub(nm as u32);
+        let matches: u32 = align_len.saturating_sub(nm as u32);
         Ok(Some((matches as f32 / align_len as f32) * 100.0))
     }
 

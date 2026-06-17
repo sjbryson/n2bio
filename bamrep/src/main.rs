@@ -268,6 +268,16 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         th {{ background-color: #f4f4f4; text-align: center; font-weight: bold; }}
         tr:nth-child(even) {{ background-color: #fafafa; }}
         td:first-child {{ text-align: left; font-weight: bold; }}
+
+        /* Text Styling */
+        p.section-desc {{ 
+            text-align: center; 
+            color: #666; 
+            font-size: 0.95em; 
+            margin: -10px auto 20px auto;
+            max-width: 800px; 
+            line-height: 1.5;
+        }}
     </style>
 </head>
 <body>
@@ -275,37 +285,65 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <h1>BAM Alignment Report</h1>
 
         <div class="divider">PE Insert Sizes</div>
+        <p class="section-desc">
+            Distribution of paired-end insert sizes for uniquely mapped, high-quality pairs. 
+            Inserts are only calculated for concordant alignments where both had a MAPQ 
+            value above the "--min_mapq" (default=40) threshold. Reads exceeding the 
+            max insert size threshold, "--max_ins" (default=1000), are excluded.
+        </p>
         <div class="grid-top">
             <div id="pe_insert_size_plot"></div>
             {table_insert}
         </div>
 
         <div class="divider">MAPQ Distribution</div>
+        <p class="section-desc">
+            Mapping quality (MAPQ) scores representing the aligner's confidence in the read's origin. 
+            Higher scores indicate greater probability of correct placement.
+        </p>
         <div class="grid-row">
             <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
         </div>
 
         <div class="divider">Alignment Scores (AS)</div>
+        <p class="section-desc">
+            Raw alignment scores indicating how well each read matches the reference genome, 
+            accounting for matches, mismatches, and gaps. This is the value of the 'AS' tag 
+            in the sam/bam record.
+        </p>
         <div class="grid-row">
             <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
         </div>
 
         <div class="divider">Alignment Lengths (AL)</div>
+        <p class="section-desc">
+            Alignment lengths are calculated from the CIGAR string. 
+            Matches, mismatches, and indels are counted; clipped regions are not.
+        </p>
         <div class="grid-row">
             <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
         </div>
 
         <div class="divider">AS per Base</div>
+        <p class="section-desc">
+            This is the record's Alignment Score divided by the Alignment Length (AS/AL).
+        </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
         </div>
 
         <div class="divider">Alignment Proportions (AP)</div>
+        <p class="section-desc">
+            This is the record's Alignment Length divided by the Read Length (AL/RL).
+        </p>
         <div class="grid-row">
             <div id="r1_align_proportion"></div> {table_ap} <div id="r2_align_proportion"></div>
         </div>
 
         <div class="divider">Alignment Percent Identity (PI)</div>
+        <p class="section-desc">
+            This is the record's number of matches (sam/bam tag "NM") divided by the Alignment Length (100 * NM/AL).
+        </p>
         <div class="grid-row">
             <div id="r1_align_accuracy"></div> {table_acc} <div id="r2_align_accuracy"></div>
         </div>
