@@ -30,11 +30,15 @@ struct Args {
     #[arg(short = 'p', long)]
     plot: bool,
 
+    /// Generate html plots
+    #[arg(short = 'h', long)]
+    html: bool,
+
     /// Minimum MAPQ score for insert size calculation
     #[arg(short = 'q', long, default_value_t = 40)]
-    mapq: usize,
+    min_mapq: usize,
 
-    /// Max insert size calculation
+    /// Max insert size to use for summary stats calculation
     #[arg(short = 'i', long, default_value_t = 1000)]
     max_ins: usize,
 }
@@ -43,8 +47,14 @@ struct Args {
 // Stats
 // ============================================================================
 
-/// JSON output format for a single statistic
-#[derive(Serialize, Default, Debug)]
+#[derive(Serialize, Default)]
+struct HistogramData {
+    bin_min: f64,
+    bin_size: f64,
+    counts: Vec<u32>,
+}
+
+#[derive(Serialize, Default)]
 struct StatSummary {
     count: f64,
     mean: f64,
@@ -52,10 +62,11 @@ struct StatSummary {
     stdev: f64,
     min: f64,
     max: f64,
+    histogram: HistogramData,
 }
 
 impl StatSummary {
-    fn calculate(data: &mut [f64]) -> Self {
+    fn calculate(name: &str, data: &mut [f64], max_ins: f64) -> Self {
         if data.is_empty() {
             return Self::default();
         }
@@ -75,14 +86,40 @@ impl StatSummary {
             data[data.len() / 2]
         };
 
+        // population vaiance
         let variance: f64 = data.iter().map(|&value| {
             let diff: f64 = mean - value;
             diff * diff
         }).sum::<f64>() / count;
+
+        // sample variance
+        //let variance_denom = if count > 1.0 { count - 1.0 } else { 1.0 };
+        //let variance: f64 = data.iter().map(|&value| {
+        //    let diff: f64 = mean - value;
+        //    diff * diff
+        //}).sum::<f64>() / variance_denom;
         
         let stdev: f64 = variance.sqrt();
 
-        Self { count, mean, median, stdev, min, max }
+        let config: ReportConfig = ReportConfig::from_stat(name, min, max, max_ins);
+        let num_bins: usize = ((config.max - config.min) / config.bin_size).ceil() as usize;
+        let mut bins: Vec<u32> = vec![0u32; num_bins.max(1)];
+
+        for &val in data.iter() {
+            if val < config.min || val >= config.max { continue; }
+            let mut idx: usize = ((val - config.min) / config.bin_size) as usize;
+            if idx >= bins.len() { idx = bins.len() - 1; }
+            bins[idx] += 1;
+        }
+
+        StatSummary {
+            count, mean, median, stdev, min, max,
+            histogram: HistogramData {
+                bin_min: config.min,
+                bin_size: config.bin_size,
+                counts: bins,
+            }
+        }
     }
 }
 
@@ -107,19 +144,18 @@ struct StatsAccumulator {
 }
 
 // ============================================================================
-// Plot - histogram
+// Report
 // ============================================================================
 
-struct PlotConfig {
+struct ReportConfig {
     min: f64,
     max: f64,
     bin_size: f64,
 }
 
-impl PlotConfig {
-    /// Determines the best plotting bounds based on the stat name and summary data
-    fn from_stat(stat_name: &str, summary: &StatSummary) -> Self {
-        // Strip the read identifier prefix so R1 and R2 use the same scale
+impl ReportConfig {
+    /// Takes the calculated min and max to determine the binning rules
+    fn from_stat(stat_name: &str, mut min: f64, mut max: f64, max_insert: f64) -> Self {
         let base_name = if stat_name.starts_with("r1_") || stat_name.starts_with("r2_") {
             &stat_name[3..]
         } else {
@@ -128,113 +164,161 @@ impl PlotConfig {
 
         match base_name {
             // MAPQ is canonically 0 to 60 (sometimes up to 255, but usually 60). Bin by 1.
-            "mapq" => PlotConfig { min: 0.0, max: 62.0, bin_size: 2.0 },
+            "mapq" => ReportConfig { min: 0.0, max: 62.0, bin_size: 2.0 },
             // Align score is max 300 for 150 base reads **change with arg if needed**
-            "align_score" => PlotConfig { min: 0.0, max: 306.0, bin_size: 6.0 },
+            "align_score" => ReportConfig { min: 0.0, max: 306.0, bin_size: 6.0 },
             // Align len is max 150 for 150 base reads **change with arg if needed**
-            "align_length" => PlotConfig { min: 0.0, max: 152.0, bin_size: 2.0 },
+            "align_length" => ReportConfig { min: 0.0, max: 152.0, bin_size: 2.0 },
             // Align score/Align len is max 2 for 150 base reads **change with arg if needed**
-            "as_al" => PlotConfig { min: 0.0, max: 2.1, bin_size: 0.05 },
+            "as_al" => ReportConfig { min: 0.0, max: 2.1, bin_size: 0.05 },
             // Proportion is exactly 0.0 to 1.0. Use 50 bins of 0.02.
-            "align_proportion" => PlotConfig { min: 0.0, max: 1.05, bin_size: 0.05 },
+            "align_proportion" => ReportConfig { min: 0.0, max: 1.05, bin_size: 0.05 },
             // Accuracy is a percentage 0.0 to 100.0. Bin by 1.0.
-            "align_accuracy" => PlotConfig { min: 0.0, max: 102.0, bin_size: 2.0 },
+            "align_accuracy" => ReportConfig { min: 0.0, max: 102.0, bin_size: 2.0 },
             // pe_insert_size range 0 to args.max_ins
-            //"pe_insert_size" => PlotConfig { min: 0.0, max: max_insert, bin_size: 10.0 },
+            "pe_insert_size" => ReportConfig { min: 0.0, max: max_insert, bin_size: 10.0 },
             // Default dynamic scaling for insert size, align score, as_al, and align length
             _ => {
-                let mut min: f64 = summary.min;
-                let mut max: f64 = summary.max;
-                
-                // Fix the "missing bars" issue if all reads have the exact same value
                 if (max - min).abs() < f64::EPSILON {
                     min -= 1.0;
                     max += 1.0;
                 }
-
-                // Add a 5% buffer to the max so the highest bar isn't cut off by the right axis
                 let padding: f64 = (max - min) * 0.05;
                 max += padding;
-
-                // Calculate a dynamic bin size targeting ~50 bins
-                let bin_size: f64 = (max - min) / 20.0;
-                
-                PlotConfig { min, max, bin_size }
+                // Target ~100 bins for dynamic stats
+                let bin_size: f64 = (max - min) / 100.0;
+                ReportConfig { min, max, bin_size }
             }
         }
     }
 }
 
+// ============================================================================
+// HTML output
+// ============================================================================
+
+fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let mut html_path: PathBuf = report_path.clone();
+    html_path.set_extension("html");
+    
+    let json_data: String = serde_json::to_string(results)?;
+
+    // Helper to format the summary table
+    let get_table_html = |name: &str| {
+        let s: &StatSummary = results.get(name).unwrap();
+        format!(
+            "<table><tr><td>Count</td><td>{:.0}</td></tr><tr><td>Mean</td><td>{:.2}</td></tr><tr><td>Median</td><td>{:.2}</td></tr><tr><td>StdDev</td><td>{:.2}</td></tr></table>",
+            s.count, s.mean, s.median, s.stdev
+        )
+    };
+
+    let html_content = format!(r#"
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        .grid-container {{ display: grid; grid-template-columns: 1fr 200px 1fr; gap: 10px; align-items: center; }}
+        table {{ font-size: 12px; border: 1px solid #ccc; width: 100%; }}
+        h1 {{ text-align: center; }}
+    </style>
+</head>
+<body>
+    <h1>BAM Alignment Report</h1>
+    <div id="insert-size-plot"></div>
+    
+    <div class="grid-container">
+        <div id="r1_mapq"></div> {table1} <div id="r2_mapq"></div>
+        <div id="r1_as_al"></div> {table2} <div id="r2_as_al"></div>
+        <div id="r1_align_length"></div> {table3} <div id="r2_align_length"></div>
+        <div id="r1_align_proportion"></div> {table4} <div id="r2_align_proportion"></div>
+    </div>
+
+    <script>
+        const data = {json_data};
+        
+        function draw(id, name) {{
+            const s = data[name];
+            const trace = {{
+                x: s.histogram.counts.map((_, i) => s.histogram.bin_min + (i * s.histogram.bin_size)),
+                y: s.histogram.counts, type: 'bar', name: name
+            }};
+            Plotly.newPlot(id, [trace], {{ title: name, margin: {{t:30, b:30}} }});
+        }}
+
+        draw('insert-size-plot', 'pe_insert_size');
+        draw('r1_mapq', 'r1_mapq'); draw('r2_mapq', 'r2_mapq');
+        draw('r1_as_al', 'r1_as_al'); draw('r2_as_al', 'r2_as_al');
+        draw('r1_align_length', 'r1_align_length'); draw('r2_align_length', 'r2_align_length');
+        draw('r1_align_proportion', 'r1_align_proportion'); draw('r2_align_proportion', 'r2_align_proportion');
+    </script>
+</body>
+</html>
+"#, 
+    json_data = json_data,
+    table1 = get_table_html("r1_mapq"), // simplified for example
+    table2 = get_table_html("r1_as_al"),
+    table3 = get_table_html("r1_align_length"),
+    table4 = get_table_html("r1_align_proportion")
+    );
+
+    std::fs::write(html_path, html_content)?;
+    Ok(())
+}
+
+// ============================================================================
+// Plot histogram
+// ============================================================================
+
 fn plot_histogram(
-    data: &[f64], 
     stat_name: &str, 
     summary: &StatSummary,
     report_path: &PathBuf
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if data.is_empty() { return Ok(()); }
+    let hist: &HistogramData = &summary.histogram;
+    if hist.counts.is_empty() { return Ok(()); }
 
-    let config: PlotConfig = PlotConfig::from_stat(stat_name, summary);
-
-    // Define a custom light blue-grey color
-    let light_blue_grey: RGBColor = RGBColor(160, 184, 206);
-    
-    // Determine plot filename
+    let ucla_lightest_blue: RGBColor = RGBColor(218, 235, 254);
     let mut plot_path: PathBuf = report_path.clone();
     plot_path.set_extension(format!("{}.svg", stat_name));
 
-    let root = SVGBackend::new(&plot_path, (640, 480)).into_drawing_area();
+    let root: DrawingArea<SVGBackend<'_>, plotters::coord::Shift> = SVGBackend::new(&plot_path, (640, 480)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    // Calculate how many bins we actually need based on the config
-    let num_bins: usize = ((config.max - config.min) / config.bin_size).ceil() as usize;
-    let mut bins: Vec<u32> = vec![0u32; num_bins.max(1)]; // Ensure at least 1 bin
-
-    // Safely assign data to bins
-    for &val in data {
-        // Ignore severe outliers that fall completely outside our expected hardcoded ranges
-        if val < config.min || val >= config.max { continue; }
-        
-        let mut idx: usize = ((val - config.min) / config.bin_size) as usize;
-        if idx >= bins.len() { idx = bins.len() - 1; }
-        bins[idx] += 1;
-    }
-
-    let max_freq: u32 = *bins.iter().max().unwrap_or(&1);
-    // Add 1% padding to the Y-axis so the tallest bar doesn't touch the top
-    let y_max: u32 = (max_freq as f64 * 1.01) as u32;
+    let max_freq: u32 = *hist.counts.iter().max().unwrap_or(&1);
+    let y_max: u32 = (max_freq as f64 * 1.05).ceil() as u32;
+    let x_max: f64 = hist.bin_min + (hist.counts.len() as f64 * hist.bin_size);
 
     let mut chart = ChartBuilder::on(&root)
         .caption(format!("Histogram of {}", stat_name), ("sans-serif", 30).into_font())
         .margin(10)
-        .x_label_area_size(40)
+        .x_label_area_size(60)
         .y_label_area_size(60)
-        .build_cartesian_2d(config.min..config.max, 0..y_max)?; // Plain f64 range
-
-    let total_bins: usize = ((config.max - config.min) / config.bin_size).round() as usize;
+        .build_cartesian_2d(hist.bin_min..x_max, 0..y_max)?;
 
     chart.configure_mesh()
-        .x_labels(total_bins) 
-        .x_label_formatter(&|v| format!("{:.1}   ", v))
-        .x_label_style(("sans-serif", 14).into_font().transform(FontTransform::Rotate270))
+        .x_labels(hist.counts.len())
+        .x_label_formatter(&|v| format!("{:.2}  ", v))
+        .x_label_style(("sans-serif", 15).into_font().transform(FontTransform::Rotate270))
         .y_desc("Count")
         .draw()?;
 
-    // Draw bins manually using Rectangles
     chart.draw_series(
-        bins.into_iter().enumerate().map(|(i, count)| {
-            let bin_left: f64 = config.min + (i as f64 * config.bin_size);
-            let bin_right: f64 = bin_left + config.bin_size; 
-            let rect: Rectangle<(f64, u32)> = Rectangle::new(
+        hist.counts.iter().enumerate().map(|(i, &count)| {
+            let bin_left: f64 = hist.bin_min + (i as f64 * hist.bin_size);
+            let bin_right: f64 = bin_left + hist.bin_size; 
+            
+            Rectangle::new(
                 [(bin_left, 0), (bin_right, count)], 
-                light_blue_grey.filled()
-            );
-            rect
+                ucla_lightest_blue.filled()
+            )
         })
     )?;
 
     root.present()?;
     Ok(())
 }
+
 
 // ============================================================================
 // Main
@@ -302,7 +386,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Mapq filtering and insert size logic
         // Only calculate insert size for highly confident, uniquely mapped pairs
-        if r1.mapq as usize >= args.mapq && r2.mapq as usize >= args.mapq {
+        if r1.mapq as usize >= args.min_mapq && r2.mapq as usize >= args.min_mapq {
             if r1.ref_id == r2.ref_id && r1.ref_id != -1 {
                 let (fwd, rev) = if r1.pos <= r2.pos { (r1, r2) } else { (r2, r1) };
                 let ref_span: i32 = rev.calculate_ref_span().unwrap_or(0) as i32;
@@ -346,7 +430,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if total_pairs == 0 {
-        // Return your custom error here
         eprintln!("No valid pairs found. Is the BAM file name-sorted (`samtools sort -n`)?");
         std::process::exit(1);
     }
@@ -370,19 +453,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("r2_align_accuracy", &mut stats.r2_align_accuracy),
     ];
 
+    let max_ins_val: f64 = args.max_ins as f64;
     // Process all 11 stats concurrently using Rayon
     let results_vec: Vec<(String, StatSummary)> = stats_to_process
         .par_iter_mut()
         .map(|(name, data)| {
-            let summary: StatSummary = StatSummary::calculate(data);
-
-            if args.plot {
-                // Pass `&summary` here!
-                if let Err(e) = plot_histogram(data, name, &summary, &args.report) {
-                    eprintln!("Warning: Failed to plot {}: {}", name, e);
-                }
-            }
-            
+            // Pass the name to get the correct config
+            let summary: StatSummary = StatSummary::calculate(name, data, max_ins_val);
             (name.to_string(), summary)
         })
         .collect();
@@ -393,9 +470,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         results.insert(name, summary);
     }
 
-    // Write JSON Report
+    // Write JSON Report (This now includes the bin vectors)
     let report_file: File = File::create(&args.report)?;
     serde_json::to_writer_pretty(report_file, &results)?;
+
+    // Handle Optional Output Formats
+    if args.plot {
+        for (name, summary) in &results {
+            if let Err(e) = plot_histogram(name, summary, &args.report) {
+                eprintln!("Warning: Failed to plot {}: {}", name, e);
+            }
+        }
+    }
+
+    if args.html {
+        if let Err(e) = generate_html_report(&results, &args.report) {
+            eprintln!("Warning: Failed to generate HTML report: {}", e);
+        }
+    }
 
     println!("Analysis complete.");
     println!("Processed {} pairs.", total_pairs);
