@@ -5,28 +5,12 @@ use std::io::{self, Error, ErrorKind};
 use std::time::Instant;
 use std::collections::BTreeMap;
 
-use n2core::bam::{ BamReader, BamRecord, CigarOp };
+use n2core::bam::{ BamReader, BamRecord, BamStats };
 
 use crate::cli::ModelArgs;
 use crate::simstats::{
     LibraryModel, InsertModel, QualityModel, NormalDistParams, update_qscore_model
 };
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Calculates how many reference bases the alignment spans using the CIGAR string
-fn calculate_ref_span(cigar: &[(CigarOp, u32)]) -> i32 {
-    cigar.iter()
-        .filter(|(op, _)| matches!(
-            op,
-            CigarOp::Match | CigarOp::Deletion | CigarOp::Skip | 
-            CigarOp::SequenceMatch | CigarOp::SequenceMismatch
-        ))
-        .map(|(_, len)| *len as i32)
-        .sum()
-}
 
 // ============================================================================
 // Main Runner
@@ -50,7 +34,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
     let mut r2_record: Option<BamRecord> = None;
     let mut prev_qname: Vec<u8>          = Vec::new();
 
-    // A closure that mutates our raw accumulators
+    // A closure that mutates accumulators
     let mut process_pair = |r1: &BamRecord, r2: &BamRecord, sizes_count: &mut usize| {
         update_qscore_model(&mut raw_r1_qual, &r1.qual);
         update_qscore_model(&mut raw_r2_qual, &r2.qual);
@@ -63,8 +47,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
                     (r2, r1)
                 };
 
-                let rev_cigar: Vec<(CigarOp, u32)> = rev.parsed_cigar();
-                let ref_span: i32 = calculate_ref_span(&rev_cigar);
+                let ref_span: i32 = rev.calculate_ref_span().unwrap_or(0) as i32;
                 let insert_size: i32 = (rev.pos + ref_span) - fwd.pos;
                 
                 if insert_size > 0 {

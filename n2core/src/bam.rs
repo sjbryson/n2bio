@@ -74,8 +74,8 @@ impl BamRecord {
         let mut ascii_seq: Vec<u8> = Vec::with_capacity(self.l_seq as usize);
 
         for i in 0..(self.l_seq as usize) {
-            let byte = self.seq[i / 2];
-            let nibble = if i % 2 == 0 {  // If the index is even, take the upper 4 bits. 
+            let byte: u8 = self.seq[i / 2];
+            let nibble: u8 = if i % 2 == 0 {  // If the index is even, take the upper 4 bits. 
                 (byte >> 4) & 0x0F
             } else {
                 byte & 0x0F                   // If odd, take the lower 4 bits.
@@ -112,6 +112,202 @@ impl BamRecord {
         }
 
         parsed
+    }
+}
+
+// ============================================================================
+// BAM stats trait and implementation
+// ============================================================================
+
+pub trait BamStats {
+    /// Retrieve an integer tag from the BAM tags byte array (e.g., b"AS" or b"NM")
+    fn get_int_tag(&self, tag: &[u8; 2]) -> Option<i32>;
+    
+    /// AS (alignment score) / AL (alignment length)
+    fn calculate_as_al(&self) -> Option<f32>;                 
+    
+    /// Sum of M, I, D, =, X operations from the CIGAR string
+    fn calculate_alignment_length(&self) -> Option<u32>;      
+    
+    /// Alignment length / Read length
+    fn calculate_alignment_proportion(&self) -> Option<f32>;  
+    
+    /// (Alignment length - NM) / Alignment length
+    fn calculate_alignment_accuracy(&self) -> Option<f32>;    
+
+    /// Calculates how many reference bases the alignment spans using the CIGAR string
+    fn calculate_ref_span(&self) -> Option<u32>;
+}
+
+impl BamStats for BamRecord {
+    
+    fn get_int_tag(&self, tag: &[u8; 2]) -> Option<i32> {
+        let mut i: usize = 0;
+        let tags: &Vec<u8> = &self.tags;
+        
+        while i + 2 < tags.len() {
+            let t1: u8 = tags[i];
+            let t2: u8 = tags[i+1];
+            let vtype: u8 = tags[i+2];
+            i += 3;
+            
+            let is_target: bool = t1 == tag[0] && t2 == tag[1];
+            
+            match vtype {
+                // 1-byte types: 'A' (char), 'c' (int8), 'C' (uint8)
+                b'A' | b'c' | b'C' => {
+                    if is_target {
+                        return if vtype == b'c' {
+                            Some(tags[i] as i8 as i32)
+                        } else {
+                            Some(tags[i] as i32)
+                        };
+                    }
+                    i += 1;
+                }
+                // 2-byte types: 's' (int16), 'S' (uint16)
+                b's' | b'S' => {
+                    if i + 1 < tags.len() {
+                        if is_target {
+                            let bytes = [tags[i], tags[i+1]];
+                            return if vtype == b's' {
+                                Some(i16::from_le_bytes(bytes) as i32)
+                            } else {
+                                Some(u16::from_le_bytes(bytes) as i32)
+                            };
+                        }
+                        i += 2;
+                    } else { break; }
+                }
+                // 4-byte types: 'i' (int32), 'I' (uint32)
+                b'i' | b'I' => {
+                    if i + 3 < tags.len() {
+                        if is_target {
+                            let bytes: [u8; 4] = [tags[i], tags[i+1], tags[i+2], tags[i+3]];
+                            return if vtype == b'i' {
+                                Some(i32::from_le_bytes(bytes))
+                            } else {
+                                // Note: Converting u32 to i32. Safe for typical tags like AS/NM.
+                                Some(u32::from_le_bytes(bytes) as i32) 
+                            };
+                        }
+                        i += 4;
+                    } else { break; }
+                }
+                // 4-byte float: 'f'
+                b'f' => i += 4,
+                // Null-terminated strings/hex: 'Z', 'H'
+                b'Z' | b'H' => {
+                    while i < tags.len() && tags[i] != 0 { i += 1; }
+                    i += 1; // skip the null terminator
+                }
+                // Arrays: 'B' -> [type: 1 byte][count: 4 bytes][elements...]
+                b'B' => {
+                    if i + 4 < tags.len() {
+                        let array_type: u8 = tags[i];
+                        let count: usize = u32::from_le_bytes([tags[i+1], tags[i+2], tags[i+3], tags[i+4]]) as usize;
+                        i += 5;
+                        
+                        let size: usize = match array_type {
+                            b'c' | b'C' => 1,
+                            b's' | b'S' => 2,
+                            b'i' | b'I' | b'f' => 4,
+                            _ => 0,
+                        };
+                        i += count * size;
+                    } else { break; }
+                }
+                _ => break, // Unknown type, exit to prevent panics
+            }
+        }
+        
+        None
+    }
+
+    fn calculate_as_al(&self) -> Option<f32> {
+        let align_len: u32 = self.calculate_alignment_length()?;
+        let as_score: i32 = self.get_int_tag(b"AS")?;
+        
+        if align_len == 0 {
+            None
+        } else {
+            Some(as_score as f32 / align_len as f32)
+        }
+    }
+
+    fn calculate_alignment_length(&self) -> Option<u32> {
+        let parsed_cigar: Vec<(CigarOp, u32)> = self.parsed_cigar();
+        if parsed_cigar.is_empty() { return None; }
+        
+        let mut align_len: u32 = 0;
+        for (op, len) in parsed_cigar {
+            match op {
+                // Operations that consume reference AND/OR mapping space
+                CigarOp::Match | CigarOp::Insertion | CigarOp::Deletion | 
+                CigarOp::SequenceMatch | CigarOp::SequenceMismatch => {
+                    align_len += len;
+                }
+                _ => {} // Skip soft clips, hard clips, padding, etc.
+            }
+        }
+        
+        Some(align_len)
+    }
+
+    fn calculate_alignment_proportion(&self) -> Option<f32> {
+        let align_len: u32 = self.calculate_alignment_length()?;
+        
+        // Use `l_seq` from the BAM fields for read length. 
+        // If the sequence is missing ('*'), l_seq is 0, so use CIGAR.
+        let read_len: u32 = if self.l_seq > 0 {
+            self.l_seq as u32
+        } else {
+            let mut calculated_len: u32 = 0;
+            for (op, len) in self.parsed_cigar() {
+                match op {
+                    CigarOp::Match | CigarOp::Insertion | CigarOp::SoftClip | 
+                    CigarOp::SequenceMatch | CigarOp::SequenceMismatch => {
+                        calculated_len += len;
+                    }
+                    _ => {}
+                }
+            }
+            calculated_len
+        };
+
+        if read_len == 0 {
+            None
+        } else {
+            Some(align_len as f32 / read_len as f32)
+        }
+    }
+
+    fn calculate_alignment_accuracy(&self) -> Option<f32> {
+        let align_len: u32 = self.calculate_alignment_length()?;
+        let nm: i32 = self.get_int_tag(b"NM")?;
+        
+        if align_len == 0 {
+            return None;
+        }
+        
+        let matches: u32 = align_len.saturating_sub(nm as u32);
+        Some((matches as f32 / align_len as f32) * 100.0)
+    }
+
+    fn calculate_ref_span(&self) -> Option<u32> {
+        let parsed_cigar = self.parsed_cigar();
+        if parsed_cigar.is_empty() { return None; }
+        
+        let span = parsed_cigar.iter()
+            .filter(|(op, _)| matches!(
+                op,
+                CigarOp::Match | CigarOp::Deletion | CigarOp::Skip | 
+                CigarOp::SequenceMatch | CigarOp::SequenceMismatch
+            ))
+            .map(|(_, len)| *len)
+            .sum();
+            
+        Some(span)
     }
 }
 
@@ -290,5 +486,131 @@ mod tests {
         assert_eq!(parsed[0], (CigarOp::Match, 3));
         assert_eq!(parsed[1], (CigarOp::Insertion, 1));
         assert_eq!(parsed[2], (CigarOp::Deletion, 2));
+    }
+
+    /// Helper to create a BamRecord with specific CIGAR operations and tags
+    fn create_record(l_seq: i32, cigar_ops: &[(u32, u8)], tags: Vec<u8>) -> BamRecord {
+        let cigar: Vec<u32> = cigar_ops
+            .iter()
+            .map(|(len, op)| (len << 4) | (*op as u32))
+            .collect();
+
+        BamRecord {
+            l_seq,
+            cigar,
+            tags,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_get_int_tag_parsing() {
+        // Tag format: [Tag1, Tag2, Type, Value...]
+        // NM:C:5 (uint8), AS:i:1000 (int32), XX:Z:skip_me\0 (string)
+        let tags: Vec<u8> = vec![
+            b'X', b'X', b'Z', b's', b'k', b'i', b'p', 0, // String tag to skip
+            b'N', b'M', b'C', 5,                         // uint8
+            b'Z', b'Z', b'f', 0, 0, 0, 0,                // Float tag to skip
+            b'A', b'S', b'i', 232, 3, 0, 0,              // int32 (1000 in little-endian)
+            b'Y', b'Y', b'c', 254,                       // int8 (-2)
+        ];
+
+        let record: BamRecord = create_record(100, &[], tags);
+
+        assert_eq!(record.get_int_tag(b"NM"), Some(5));
+        assert_eq!(record.get_int_tag(b"AS"), Some(1000));
+        assert_eq!(record.get_int_tag(b"YY"), Some(-2));
+        assert_eq!(record.get_int_tag(b"XX"), None); // Not an int tag
+        assert_eq!(record.get_int_tag(b"ZZ"), None); // Not an int tag
+        assert_eq!(record.get_int_tag(b"NA"), None); // Missing tag
+    }
+
+    #[test]
+    fn test_calculate_alignment_length() {
+        // CIGAR: 50M (op 0), 10I (op 1), 5D (op 2), 20S (op 4)
+        // Alignment length should be M + I + D = 50 + 10 + 5 = 65
+        let record: BamRecord = create_record(0, &[(50, 0), (10, 1), (5, 2), (20, 4)], vec![]);
+        
+        assert_eq!(record.calculate_alignment_length(), Some(65));
+    }
+
+    #[test]
+    fn test_calculate_as_al() {
+        // CIGAR: 80M (op 0) -> align_len = 80
+        // AS:s:120 (int16)
+        let tags: Vec<u8> = vec![b'A', b'S', b's', 120, 0];
+        let record: BamRecord = create_record(80, &[(80, 0)], tags);
+
+        // 120.0 / 80.0 = 1.5
+        assert_eq!(record.calculate_as_al(), Some(1.5));
+    }
+
+    #[test]
+    fn test_calculate_alignment_proportion_with_l_seq() {
+        // CIGAR: 50M (op 0), 50S (op 4) -> align_len = 50
+        // l_seq = 100
+        let record: BamRecord = create_record(100, &[(50, 0), (50, 4)], vec![]);
+
+        // 50.0 / 100.0 = 0.5
+        assert_eq!(record.calculate_alignment_proportion(), Some(0.5));
+    }
+
+    #[test]
+    fn test_calculate_alignment_proportion_without_l_seq() {
+        // Missing sequence data (l_seq = 0)
+        // CIGAR: 50M (op 0), 10I (op 1), 20S (op 4) -> align_len = 60
+        // Calculated read length: M + I + S = 50 + 10 + 20 = 80
+        let record: BamRecord = create_record(0, &[(50, 0), (10, 1), (20, 4)], vec![]);
+
+        // 60.0 / 80.0 = 0.75
+        assert_eq!(record.calculate_alignment_proportion(), Some(0.75));
+    }
+
+    #[test]
+    fn test_calculate_alignment_accuracy() {
+        // CIGAR: 100M (op 0) -> align_len = 100
+        // NM:C:5 (uint8) -> 5 mismatches
+        let tags: Vec<u8> = vec![b'N', b'M', b'C', 5];
+        let record: BamRecord = create_record(100, &[(100, 0)], tags);
+
+        // (100 - 5) / 100 * 100 = 95.0%
+        assert_eq!(record.calculate_alignment_accuracy(), Some(95.0));
+    }
+
+    #[test]
+    fn test_calculate_alignment_accuracy_high_nm() {
+        // NM is larger than alignment length (should safely saturate to 0 matches)
+        // CIGAR: 10M -> align_len = 10
+        // NM:C:15 -> 15 mismatches
+        let tags: Vec<u8> = vec![b'N', b'M', b'C', 15];
+        let record: BamRecord = create_record(10, &[(10, 0)], tags);
+
+        assert_eq!(record.calculate_alignment_accuracy(), Some(0.0));
+    }
+
+    #[test]
+    fn test_empty_cigar() {
+        // Unmapped read with no CIGAR
+        let record: BamRecord = create_record(100, &[], vec![b'A', b'S', b'C', 40]);
+
+        assert_eq!(record.calculate_alignment_length(), None);
+        assert_eq!(record.calculate_as_al(), None);
+        assert_eq!(record.calculate_alignment_proportion(), None);
+        assert_eq!(record.calculate_alignment_accuracy(), None);
+    }
+
+    #[test]
+    fn test_calculate_ref_span() {
+        // CIGAR: 50M (op 0), 10I (op 1), 5D (op 2), 100N (op 3), 20S (op 4)
+        // Reference consuming operations are M (50), D (5), and N (100).
+        // Total ref span should be 50 + 5 + 100 = 155
+        // Insertions (I) and Soft Clips (S) do not consume the reference.
+        let record = create_record(
+            80, 
+            &[(50, 0), (10, 1), (5, 2), (100, 3), (20, 4)], 
+            vec![]
+        );
+        
+        assert_eq!(record.calculate_ref_span(), Some(155));
     }
 }
