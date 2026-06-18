@@ -20,21 +20,17 @@ cargo build --release
 3. **Other Useful Commands:**
   - Run Tests: To execute the project's test suite, run: ```cargo test```
   - Local Installation: To install the binary globally to your machine, run: ```cargo install --path . ```
-  - For more details on managing Rust packages, visit the official Cargo Book.
+  - For more details on managing Rust packages, visit the official [Cargo Book](https://doc.rust-lang.org/cargo/).
 
----
 ---
 
 ### Modules:
 
-
 **n2core/** - Modules I'm developing to work with standard file formats and IO.
 
 ---
----
 
 ### Cli Tools:
-
 
 **fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 
