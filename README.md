@@ -218,3 +218,7 @@ Options:
   - **pfqsim compose** - ToDo:
 
   - **pfqsim analyze** - ToDo:
+
+  ---
+
+  **xbag/** - Very experimental code for building nucleotide variation graphs from a set of closely related (e.g. strain/species) genomes.
