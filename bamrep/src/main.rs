@@ -170,7 +170,7 @@ impl ReportConfig {
             // Align len is max 150 for 150 base reads **change with arg if needed**
             "align_length" => ReportConfig { min: 0.0, max: 151.0, bin_size: 1.0 },
             // Align score/Align len is max 2 for 150 base reads **change with arg if needed**
-            "as_al" => ReportConfig { min: 0.0, max: 2.05, bin_size: 0.01 },
+            "as_al" => ReportConfig { min: 0.0, max: 2.01, bin_size: 0.01 },
             // Proportion is exactly 0.0 to 1.0. Use 50 bins of 0.02.
             "align_proportion" => ReportConfig { min: 0.0, max: 1.01, bin_size: 0.01 },
             // Accuracy is a percentage 0.0 to 100.0. Bin by 1.0.
