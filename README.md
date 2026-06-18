@@ -215,9 +215,9 @@ Options:
   -t, --threads <THREADS>          Number of worker threads
   -h, --help                       Print help
   ```
-  - **pfqsim compose** - ToDo:
+  - **pfqsim compose** - ToDo: Use a config file to create a test library from a set of simulated read libraries.
 
-  - **pfqsim analyze** - ToDo:
+  - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivuty, ROC, etc.
 
   ---
 
