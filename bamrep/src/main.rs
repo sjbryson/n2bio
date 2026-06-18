@@ -330,7 +330,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <p class="section-desc">
             Raw alignment scores indicating how well each read matches the reference genome, 
             accounting for matches, mismatches, and gaps. This is the value of the "AS" tag 
-            in the sam/bam record. Unaligned reads are not included.
+            in the sam/bam record. Unaligned reads are not included. Only scores >= 0 are plotted.
         </p>
         <div class="grid-row">
             <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
@@ -344,7 +344,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <p class="section-desc">
             Alignment lengths are calculated from the CIGAR string. 
             Matches, mismatches, and indels are counted; clipped regions are not. 
-            Unaligned reads are not included.
+            Unaligned reads are not included. AL is capped at the max read length.
         </p>
         <div class="grid-row">
             <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
@@ -357,7 +357,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">AS per Base</div>
         <p class="section-desc">
             This is the record's Alignment Score divided by the Alignment Length (AS/AL).
-            Unaligned reads are not included..
+            Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
@@ -383,6 +383,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">Alignment Percent Identity (PI)</div>
         <p class="section-desc">
             This is the record's number of matches (sam/bam tag "NM") divided by the Alignment Length (100 * NM/AL).
+            Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_align_accuracy"></div> {table_acc} <div id="r2_align_accuracy"></div>
