@@ -6,6 +6,24 @@
 
 ---
 
+### Setup & Installation
+
+1. **Install Cargo:** Ensure you have Rust and Cargo installed on your system. If you don't have it, follow the official installation instructions on [rustup.rs](https://rustup.rs/).
+
+2. **Clone & Build:** Clone the repository, navigate into the directory, and build the binary:
+   
+   ```
+   git clone [https://github.com/sjbryson/n2bio.git](https://github.com/sjbryson/n2bio.git)
+   cd n2bio
+   cargo build --release
+  ```
+3. **Other Useful Commands:**
+  - Run Tests: To execute the project's test suite, run: ```cargo test```
+  - Local Installation: To install the binary globally to your machine, run: ```cargo install --path . ```
+  - For more details on managing Rust packages, visit the official Cargo Book.
+
+---
+
 ### modules:
 
 

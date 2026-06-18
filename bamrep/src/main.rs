@@ -295,7 +295,6 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         /* Slider styles */
         .slider-row {{ display: flex; justify-content: center; align-items: center; margin-bottom: 40px; gap: 15px; font-size: 14px; font-weight: bold; color: #444; }}
         input[type=range] {{ width: 300px; }}
-
     </style>
 </head>
 <body>
@@ -317,7 +316,8 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">MAPQ Distribution</div>
         <p class="section-desc">
             Mapping quality (MAPQ) scores representing the aligner's confidence in the read's origin. 
-            Higher scores indicate greater probability of correct placement.
+            Higher scores indicate greater probability of correct placement. Unaligned reads are included
+            as MAPQ = 0.
         </p>
         <div class="grid-row">
             <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
@@ -327,12 +327,11 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
             <input type="range" id="mapq_slider">
         </div>
 
-
         <div class="divider">Alignment Scores (AS)</div>
         <p class="section-desc">
             Raw alignment scores indicating how well each read matches the reference genome, 
-            accounting for matches, mismatches, and gaps. This is the value of the 'AS' tag 
-            in the sam/bam record.
+            accounting for matches, mismatches, and gaps. This is the value of the "AS" tag 
+            in the sam/bam record. Unaligned reads are included as AS = 0.
         </p>
         <div class="grid-row">
             <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
@@ -345,7 +344,9 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">Alignment Lengths (AL)</div>
         <p class="section-desc">
             Alignment lengths are calculated from the CIGAR string. 
-            Matches, mismatches, and indels are counted; clipped regions are not.
+            Matches, mismatches, and indels are counted; clipped regions are not. 
+            Unaligned reads are included as AL = 0. Deletions can increase the AL 
+            above the read length, but hist plots are capped at the max read length.
         </p>
         <div class="grid-row">
             <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
@@ -358,6 +359,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">AS per Base</div>
         <p class="section-desc">
             This is the record's Alignment Score divided by the Alignment Length (AS/AL).
+            Unaligned reads are included as 0 counts.
         </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
@@ -370,6 +372,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">Alignment Proportions (AP)</div>
         <p class="section-desc">
             This is the record's Alignment Length divided by the Read Length (AL/RL).
+            Unaligned reads are included as AP = 0. As with AL, deletions can cause AP > 1.
         </p>
         <div class="grid-row">
             <div id="r1_align_proportion"></div> {table_ap} <div id="r2_align_proportion"></div>
@@ -495,14 +498,13 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
             slider.dispatchEvent(new Event('input'));
         }}
 
-        // Wire up the interactive sliders
+        // Setup interactive sliders
         setupSlider('mapq', 'r1_mapq', 'r2_mapq');
         setupSlider('align_score', 'r1_align_score', 'r2_align_score');
         setupSlider('align_length', 'r1_align_length', 'r2_align_length');
         setupSlider('as_al', 'r1_as_al', 'r2_as_al');
         setupSlider('align_proportion', 'r1_align_proportion', 'r2_align_proportion');
         setupSlider('align_accuracy', 'r1_align_accuracy', 'r2_align_accuracy');
-        
     </script>
 </body>
 </html>
@@ -621,6 +623,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut stats.r2_align_accuracy
             )
         };  
+        // If read is unmapped push 0 to each vec
+        if r.mapq == 0 {
+            mapq_vec.push(0 as f64);
+            align_score_vec.push(0 as f64);
+            align_len_vec.push(0 as f64);
+            as_al_vec.push(0 as f64);
+            align_prop_vec.push(0 as f64);
+            align_acc_vec.push(0 as f64);
+        }
 
         // Only push alignment metrics if the read is mapped
         if r.mapq > 0 {
