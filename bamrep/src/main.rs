@@ -41,6 +41,10 @@ struct Args {
     /// Max insert size to use for summary stats calculation
     #[arg(short = 'i', long, default_value_t = 1000)]
     max_ins: usize,
+
+    /// Max read length to use
+    #[arg(short = 'l', long, default_value_t = 150)]
+    max_len: usize,
 }
 
 // ============================================================================
@@ -66,7 +70,7 @@ struct StatSummary {
 }
 
 impl StatSummary {
-    fn calculate(name: &str, data: &mut [f64], max_ins: f64) -> Self {
+    fn calculate(name: &str, data: &mut [f64], max_ins: f64, max_len: f64) -> Self {
         if data.is_empty() {
             return Self::default();
         }
@@ -101,7 +105,7 @@ impl StatSummary {
         
         let stdev: f64 = variance.sqrt();
 
-        let config: ReportConfig = ReportConfig::from_stat(name, min, max, max_ins);
+        let config: ReportConfig = ReportConfig::from_stat(name, min, max, max_ins, max_len);
         let num_bins: usize = ((config.max - config.min) / config.bin_size).ceil() as usize;
         let mut bins: Vec<u32> = vec![0u32; num_bins.max(1)];
 
@@ -155,20 +159,23 @@ struct ReportConfig {
 
 impl ReportConfig {
     /// Takes the calculated min and max to determine the binning rules
-    fn from_stat(stat_name: &str, mut min: f64, mut max: f64, max_insert: f64) -> Self {
+    fn from_stat(stat_name: &str, mut min: f64, mut max: f64, max_insert: f64, max_len: f64) -> Self {
         let base_name = if stat_name.starts_with("r1_") || stat_name.starts_with("r2_") {
             &stat_name[3..]
         } else {
             stat_name
         };
 
+        let max_as: f64 = 2.0 * max_len + 1.0;
+        let max_al: f64 = max_len + 1.0;
+       
         match base_name {
             // MAPQ is canonically 0 to 60 (sometimes up to 255, but usually 60). Bin by 1.
             "mapq" => ReportConfig { min: 0.0, max: 61.0, bin_size: 1.0 },
             // Align score is max 300 for 150 base reads **change with arg if needed**
-            "align_score" => ReportConfig { min: 0.0, max: 301.0, bin_size: 1.0 },
+            "align_score" => ReportConfig { min: 0.0, max: max_as, bin_size: 1.0 },
             // Align len is max 150 for 150 base reads **change with arg if needed**
-            "align_length" => ReportConfig { min: 0.0, max: 151.0, bin_size: 1.0 },
+            "align_length" => ReportConfig { min: 0.0, max: max_al, bin_size: 1.0 },
             // Align score/Align len is max 2 for 150 base reads **change with arg if needed**
             "as_al" => ReportConfig { min: 0.0, max: 2.01, bin_size: 0.01 },
             // Proportion is exactly 0.0 to 1.0. Use 50 bins of 0.02.
@@ -701,12 +708,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let max_ins_val: f64 = args.max_ins as f64;
+    let max_len_val: f64 = args.max_len as f64;
     // Process all 11 stats concurrently using Rayon
     let results_vec: Vec<(String, StatSummary)> = stats_to_process
         .par_iter_mut()
         .map(|(name, data)| {
             // Pass the name to get the correct config
-            let summary: StatSummary = StatSummary::calculate(name, data, max_ins_val);
+            let summary: StatSummary = StatSummary::calculate(name, data, max_ins_val, max_len_val);
             (name.to_string(), summary)
         })
         .collect();
