@@ -164,20 +164,20 @@ impl ReportConfig {
 
         match base_name {
             // MAPQ is canonically 0 to 60 (sometimes up to 255, but usually 60). Bin by 1.
-            "mapq" => ReportConfig { min: 0.0, max: 62.0, bin_size: 2.0 },
+            "mapq" => ReportConfig { min: 0.0, max: 61.0, bin_size: 1.0 },
             // Align score is max 300 for 150 base reads **change with arg if needed**
-            "align_score" => ReportConfig { min: 0.0, max: 306.0, bin_size: 6.0 },
+            "align_score" => ReportConfig { min: 0.0, max: 301.0, bin_size: 1.0 },
             // Align len is max 150 for 150 base reads **change with arg if needed**
-            "align_length" => ReportConfig { min: 0.0, max: 152.0, bin_size: 2.0 },
+            "align_length" => ReportConfig { min: 0.0, max: 151.0, bin_size: 1.0 },
             // Align score/Align len is max 2 for 150 base reads **change with arg if needed**
-            "as_al" => ReportConfig { min: 0.0, max: 2.1, bin_size: 0.05 },
+            "as_al" => ReportConfig { min: 0.0, max: 2.05, bin_size: 0.01 },
             // Proportion is exactly 0.0 to 1.0. Use 50 bins of 0.02.
-            "align_proportion" => ReportConfig { min: 0.0, max: 1.05, bin_size: 0.05 },
+            "align_proportion" => ReportConfig { min: 0.0, max: 1.01, bin_size: 0.01 },
             // Accuracy is a percentage 0.0 to 100.0. Bin by 1.0.
-            "align_accuracy" => ReportConfig { min: 0.0, max: 102.0, bin_size: 2.0 },
+            "align_accuracy" => ReportConfig { min: 0.0, max: 101.0, bin_size: 1.0 },
             // pe_insert_size range 0 to args.max_ins
             "pe_insert_size" => ReportConfig { min: 0.0, max: max_insert, bin_size: 10.0 },
-            // Default dynamic scaling for insert size, align score, as_al, and align length
+            // Default dynamic scaling
             _ => {
                 if (max - min).abs() < f64::EPSILON {
                     min -= 1.0;
@@ -221,7 +221,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
     };
 
     // Helper to format the combined R1/R2 tables
-    let get_combined_table = |r1_name: &str, r2_name: &str| {
+    let get_combined_table = |base_name: &str, r1_name: &str, r2_name: &str| {
         let r1: &StatSummary = results.get(r1_name).unwrap();
         let r2: &StatSummary = results.get(r2_name).unwrap();
         format!(
@@ -233,12 +233,18 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
                 <tr><td>StdDev</td><td>{:.2}</td><td>{:.2}</td></tr>
                 <tr><td>Min</td><td>{:.2}</td><td>{:.2}</td></tr>
                 <tr><td>Max</td><td>{:.2}</td><td>{:.2}</td></tr>
+                <tr style="background-color: #fff3e0; font-weight: bold;">
+                    <td>Count &ge; <span id="{}_thresh_val">0</span></td>
+                    <td id="{}_thresh_count">-</td>
+                    <td id="{}_thresh_count">-</td>
+                </tr>
             </table>"#,
-            r1.count, r2.count, r1.mean, r2.mean, r1.median, r2.median, r1.stdev, r2.stdev, r1.min, r2.min, r1.max, r2.max
+            r1.count, r2.count, r1.mean, r2.mean, r1.median, r2.median, r1.stdev, r2.stdev, r1.min, r2.min, r1.max, r2.max,
+            base_name, r1_name, r2_name
         )
     };
 
-    let html_content = format!(r#"
+    let html_content: String = format!(r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -278,6 +284,11 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
             max-width: 800px; 
             line-height: 1.5;
         }}
+
+        /* Slider styles */
+        .slider-row {{ display: flex; justify-content: center; align-items: center; margin-bottom: 40px; gap: 15px; font-size: 14px; font-weight: bold; color: #444; }}
+        input[type=range] {{ width: 300px; }}
+
     </style>
 </head>
 <body>
@@ -304,6 +315,11 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="grid-row">
             <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
         </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="mapq_slider">
+        </div>
+
 
         <div class="divider">Alignment Scores (AS)</div>
         <p class="section-desc">
@@ -314,6 +330,10 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="grid-row">
             <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
         </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="align_score_slider">
+        </div>
 
         <div class="divider">Alignment Lengths (AL)</div>
         <p class="section-desc">
@@ -323,6 +343,10 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="grid-row">
             <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
         </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="align_length_slider">
+        </div>
 
         <div class="divider">AS per Base</div>
         <p class="section-desc">
@@ -330,6 +354,10 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
+        </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="as_al_slider">
         </div>
 
         <div class="divider">Alignment Proportions (AP)</div>
@@ -339,6 +367,10 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="grid-row">
             <div id="r1_align_proportion"></div> {table_ap} <div id="r2_align_proportion"></div>
         </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="align_proportion_slider">
+        </div>
 
         <div class="divider">Alignment Percent Identity (PI)</div>
         <p class="section-desc">
@@ -346,6 +378,10 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         </p>
         <div class="grid-row">
             <div id="r1_align_accuracy"></div> {table_acc} <div id="r2_align_accuracy"></div>
+        </div>
+        <div class="slider-row">
+            <label>Threshold:</label>
+            <input type="range" id="align_accuracy_slider">
         </div>
     </div>
 
@@ -396,18 +432,82 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         // Draw Align Accuracy (PI)
         draw('r1_align_accuracy', 'r1_align_accuracy', 'R1 Alignment Percent Identity (PI)');
         draw('r2_align_accuracy', 'r2_align_accuracy', 'R2 Alignment Percent Identity (PI)');
+
+        // Interactive Threshold Logic
+        function setupSlider(base_name, r1_name, r2_name) {{
+            const slider = document.getElementById(base_name + '_slider');
+            if (!slider) return;
+
+            const r1_data = data[r1_name];
+            const r2_data = data[r2_name];
+            
+            const min = r1_data.histogram.bin_min;
+            const bin_size = r1_data.histogram.bin_size;
+            const max = min + (r1_data.histogram.counts.length * bin_size);
+
+            // Configure slider dynamically based on the bin configuration
+            slider.min = min;
+            slider.max = max;
+            slider.step = bin_size;
+            slider.value = min;
+
+            slider.addEventListener('input', function(e) {{
+                const thresh = parseFloat(e.target.value);
+                
+                // 1. Update the table labels
+                document.getElementById(base_name + '_thresh_val').innerText = thresh.toFixed(2);
+
+                // 2. Calculate R1 Count >= Threshold
+                let r1_sum = 0;
+                r1_data.histogram.counts.forEach((count, i) => {{
+                    if (min + (i * bin_size) >= thresh) r1_sum += count;
+                }});
+                document.getElementById(r1_name + '_thresh_count').innerText = r1_sum;
+
+                // 3. Calculate R2 Count >= Threshold
+                let r2_sum = 0;
+                r2_data.histogram.counts.forEach((count, i) => {{
+                    if (min + (i * bin_size) >= thresh) r2_sum += count;
+                }});
+                document.getElementById(r2_name + '_thresh_count').innerText = r2_sum;
+
+                // 4. Draw a vertical line on both plots to show the threshold
+                const line_update = {{
+                    shapes: [{{
+                        type: 'line',
+                        x0: thresh, x1: thresh,
+                        y0: 0, y1: 1, yref: 'paper',
+                        line: {{ color: 'red', width: 2, dash: 'dot' }}
+                    }}]
+                }};
+                Plotly.relayout(r1_name, line_update);
+                Plotly.relayout(r2_name, line_update);
+            }});
+
+            // Trigger once to initialize table values
+            slider.dispatchEvent(new Event('input'));
+        }}
+
+        // Wire up the interactive sliders
+        setupSlider('mapq', 'r1_mapq', 'r2_mapq');
+        setupSlider('align_score', 'r1_align_score', 'r2_align_score');
+        setupSlider('align_length', 'r1_align_length', 'r2_align_length');
+        setupSlider('as_al', 'r1_as_al', 'r2_as_al');
+        setupSlider('align_proportion', 'r1_align_proportion', 'r2_align_proportion');
+        setupSlider('align_accuracy', 'r1_align_accuracy', 'r2_align_accuracy');
+        
     </script>
 </body>
 </html>
 "#, 
     json_data = json_data,
     table_insert = get_single_table("pe_insert_size"),
-    table_mapq = get_combined_table("r1_mapq", "r2_mapq"),
-    table_as = get_combined_table("r1_align_score", "r2_align_score"),
-    table_al = get_combined_table("r1_align_length", "r2_align_length"),
-    table_asal = get_combined_table("r1_as_al", "r2_as_al"),
-    table_ap = get_combined_table("r1_align_proportion", "r2_align_proportion"),
-    table_acc = get_combined_table("r1_align_accuracy", "r2_align_accuracy")
+    table_mapq = get_combined_table("mapq","r1_mapq", "r2_mapq"),
+    table_as = get_combined_table("align_score","r1_align_score", "r2_align_score"),
+    table_al = get_combined_table("align_length","r1_align_length", "r2_align_length"),
+    table_asal = get_combined_table("as_al","r1_as_al", "r2_as_al"),
+    table_ap = get_combined_table("align_proportion","r1_align_proportion", "r2_align_proportion"),
+    table_acc = get_combined_table("align_accuracy","r1_align_accuracy", "r2_align_accuracy")
     );
 
     std::fs::write(html_path, html_content)?;
@@ -447,7 +547,7 @@ fn plot_histogram(
     chart.configure_mesh()
         .x_labels(hist.counts.len())
         .x_label_formatter(&|v| format!("{:.2}  ", v))
-        .x_label_style(("sans-serif", 15).into_font().transform(FontTransform::Rotate270))
+        .x_label_style(("sans-serif", 12).into_font().transform(FontTransform::Rotate270))
         .y_desc("Count")
         .draw()?;
 
@@ -466,7 +566,6 @@ fn plot_histogram(
     root.present()?;
     Ok(())
 }
-
 
 // ============================================================================
 // Main
@@ -585,7 +684,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
    println!("BAM reading complete. Processed {} pairs. Generating summaries and plots...", total_pairs);
 
     // Group all 11 vectors into a list so Rayon can process them concurrently
-    let mut stats_to_process = vec![
+    let mut stats_to_process: Vec<(&str, &mut Vec<f64>)> = vec![
         ("pe_insert_size", &mut stats.pe_insert_size),
         ("r1_mapq", &mut stats.r1_mapq),
         ("r2_mapq", &mut stats.r2_mapq),
