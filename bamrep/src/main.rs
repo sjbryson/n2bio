@@ -205,7 +205,7 @@ impl ReportConfig {
 // ============================================================================
 
 fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let mut html_path = report_path.clone();
+    let mut html_path: PathBuf = report_path.clone();
     html_path.set_extension("html");
 
     let json_data: String = serde_json::to_string(results)?;
@@ -755,7 +755,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Write JSON Report
-    let report_file: File = File::create(&args.report)?;
+    let mut json_path: PathBuf = args.report.clone();
+    json_path.set_extension("json"); // Enforces the .json extension
+
+    let report_file: File = File::create(&json_path)?;
     serde_json::to_writer_pretty(report_file, &results)?;
 
     // Handle Optional Output Formats
@@ -775,7 +778,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Analysis complete.");
     println!("Processed {} pairs.", total_pairs);
-    println!("Results saved to {:?}", args.report);
+    println!("Results saved to {:?}", &json_path);
     
     Ok(())
 }
