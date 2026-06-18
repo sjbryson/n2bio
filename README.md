@@ -36,9 +36,9 @@ cargo build --release
 
 **fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 
-```
-Pipeline example:
+**Pipeline example:**
 
+```
 minimap2 -ax sr --eqx --secondary=no {map_threads} {input_mmi} {r1} {r2} | \
 fastfilter {filter_threads} {max_ap} {max_pi} {max_as} {max_al} {max_sl} {max_mq} {fq_prefix}
 
@@ -63,24 +63,24 @@ Options:
 
 **fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
 
-```
-Pipeline example:
+**Pipeline example:**
 
+```
 minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
 fastcov {cov_threads} -r {sample} {min_as} | \
 samtools sort {sort_threads} - -o {sample}.sorted.bam
-
+```
 Or if you don't want to save the sam/bam file - pipe to /dev/null:
-
+```
 minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
 fastcov {cov_threads} -r {sample} {min_as} > /dev/null
-
+```
 And if you want to test filtering parameters from an existing sam/bam file:
-
+```
 samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
-
+```
 If a viral taxonomy db was created using vref2db (use option --db <path to SQLite db file>) lineage data for the associated Accession will be reported.
-
+```
 Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
 
 Options:
