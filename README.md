@@ -22,14 +22,16 @@ cargo build --release
   - Local Installation: To install the binary globally to your machine, run: ```cargo install --path . ```
   - For more details on managing Rust packages, visit the official Cargo Book.
 
-===
+---
+---
 
 ### Modules:
 
 
 **n2core/** - Modules I'm developing to work with standard file formats and IO.
 
-===
+---
+---
 
 ### Cli Tools:
 
