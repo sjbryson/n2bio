@@ -316,8 +316,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">MAPQ Distribution</div>
         <p class="section-desc">
             Mapping quality (MAPQ) scores representing the aligner's confidence in the read's origin. 
-            Higher scores indicate greater probability of correct placement. Unaligned reads are included
-            as MAPQ = 0.
+            Higher scores indicate greater probability of correct placement. Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
@@ -331,7 +330,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <p class="section-desc">
             Raw alignment scores indicating how well each read matches the reference genome, 
             accounting for matches, mismatches, and gaps. This is the value of the "AS" tag 
-            in the sam/bam record. Unaligned reads are included as AS = 0.
+            in the sam/bam record. Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_align_score"></div> {table_as} <div id="r2_align_score"></div>
@@ -345,8 +344,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <p class="section-desc">
             Alignment lengths are calculated from the CIGAR string. 
             Matches, mismatches, and indels are counted; clipped regions are not. 
-            Unaligned reads are included as AL = 0. Deletions can increase the AL 
-            above the read length, but hist plots are capped at the max read length.
+            Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_align_length"></div> {table_al} <div id="r2_align_length"></div>
@@ -359,7 +357,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">AS per Base</div>
         <p class="section-desc">
             This is the record's Alignment Score divided by the Alignment Length (AS/AL).
-            Unaligned reads are included as 0 counts.
+            Unaligned reads are not included..
         </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
@@ -372,7 +370,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">Alignment Proportions (AP)</div>
         <p class="section-desc">
             This is the record's Alignment Length divided by the Read Length (AL/RL).
-            Unaligned reads are included as AP = 0. As with AL, deletions can cause AP > 1.
+            Unaligned reads are not included.
         </p>
         <div class="grid-row">
             <div id="r1_align_proportion"></div> {table_ap} <div id="r2_align_proportion"></div>
@@ -594,6 +592,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_pairs: i32 = 0;
     let mut stats: StatsAccumulator = StatsAccumulator::default();
 
+    // Set some max parapeter values based on args.max_len
+    let max_mapq: f64 = 60.0;
+    let max_as: f64 = 2.0 * args.max_len as f64;
+    let max_al: f64 = args.max_len as f64;
+    let max_as_al: f64 = 2.0;
+    let max_align_prop: f64 = 1.0;
+    let max_align_pi: f64 = 100.0;
+
     // Closure to extract alignment stats from individual reads
     let mut extract_read_stats = |r: &BamRecord, is_r1: bool| {
         // Route the data to the correct vectors
@@ -624,23 +630,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         };  
         // If read is unmapped push 0 to each vec
-        if r.mapq == 0 {
-            mapq_vec.push(0 as f64);
-            align_score_vec.push(0 as f64);
-            align_len_vec.push(0 as f64);
-            as_al_vec.push(0 as f64);
-            align_prop_vec.push(0 as f64);
-            align_acc_vec.push(0 as f64);
-        }
+        //if r.mapq == 0 {
+        //    mapq_vec.push(0 as f64);
+        //    align_score_vec.push(0 as f64);
+        //    align_len_vec.push(0 as f64);
+        //    as_al_vec.push(0 as f64);
+        //    align_prop_vec.push(0 as f64);
+        //    align_acc_vec.push(0 as f64);
+        //}
 
         // Only push alignment metrics if the read is mapped
         if r.mapq > 0 {
-            mapq_vec.push(r.mapq as f64);
-            if let Some(val) = r.get_int_tag(b"AS") { align_score_vec.push(val as f64); }
-            if let Some(val) = r.calculate_alignment_length() { align_len_vec.push(val as f64); }
-            if let Some(val) = r.calculate_as_al() { as_al_vec.push(val as f64); }
-            if let Some(val) = r.calculate_alignment_proportion() { align_prop_vec.push(val as f64); }
-            if let Some(val) = r.calculate_alignment_accuracy() { align_acc_vec.push(val as f64); }
+            mapq_vec.push((r.mapq as f64).min(max_mapq));
+            
+            if let Some(val) = r.get_int_tag(b"AS") { 
+                align_score_vec.push((val as f64).min(max_as)); 
+            }
+            if let Some(val) = r.calculate_alignment_length() { 
+                align_len_vec.push((val as f64).min(max_al)); 
+            }
+            if let Some(val) = r.calculate_as_al() { 
+                as_al_vec.push((val as f64).min(max_as_al)); 
+            }
+            if let Some(val) = r.calculate_alignment_proportion() { 
+                align_prop_vec.push((val as f64).min(max_align_prop)); 
+            }
+            if let Some(val) = r.calculate_alignment_accuracy() { 
+                align_acc_vec.push((val as f64).min(max_align_pi)); 
+            }
         }
     };
 
