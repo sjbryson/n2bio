@@ -357,7 +357,7 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
         <div class="divider">AS per Base</div>
         <p class="section-desc">
             This is the record's Alignment Score divided by the Alignment Length (AS/AL).
-            Unaligned reads are not included.
+            Unaligned reads are not included. Only scores >= 0 are plotted.
         </p>
         <div class="grid-row">
             <div id="r1_as_al"></div> {table_asal} <div id="r2_as_al"></div>
