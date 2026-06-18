@@ -10,7 +10,7 @@
 
 1. **Install Cargo:** Ensure you have Rust and Cargo installed on your system. If you don't have it, follow the official installation instructions on [rustup.rs](https://rustup.rs/).
 
-2. **Clone & Build:** Clone the repository, navigate into the directory, and build the binary:
+2. **Clone & Build:** Clone the repository, navigate into the directory, and build the binary (located in n2bio/target/release/):
    
 ```
 git clone https://github.com/sjbryson/n2bio.git
