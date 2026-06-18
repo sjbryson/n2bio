@@ -114,7 +114,7 @@ Options:
 ```
 ---
 
-**bamrep/** - Generate a report from a name sorted bam file for an alignment of paired end reads. Optional Html and Svg reports in addition to standard json output of summary stats + histograms for insert size (calculated using alignments that pass user defined max insert size and min mapq values), mapq values, alignment scores, alignment lengths, per base alignments cores, alignment proportions, and alignment percent identities. Html output (--html option) uses plotly and allows saving png files; the svg (--plot option) is ok, but formatting is a little off.
+**bamrep/** - Generate a report from a name sorted bam file for an alignment of paired end reads. Optional Html and Svg reports in addition to standard json output of summary stats + histograms for insert size (calculated using alignments that pass user defined max insert size and min mapq values), mapq values, alignment scores, alignment lengths, per base alignments cores, alignment proportions, and alignment percent identities. Html output (--html option) uses plotly, has sliders to check thresholds for filtering alignments, and allows savingindividual plots as png files. The svg (--plot option) is ok, but getting the formatting correct will take some additional work.
 
 ```
 Usage: bamrep [OPTIONS] --bam <BAM> --report <REPORT>
