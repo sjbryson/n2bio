@@ -24,14 +24,14 @@ cargo build --release
 
 ---
 
-### modules:
+### Modules:
 
 
 **n2core/** - Modules I'm developing to work with standard file formats and IO.
 
 ---
 
-### cli tools:
+### Cli Tools:
 
 
 **fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
