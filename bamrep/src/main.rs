@@ -404,20 +404,21 @@ fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &Pa
                 name: plot_title,
                 marker: {{ 
                     color: 'rgb(218, 235, 254)', 
-                    line: {{ color: 'rgb(160, 184, 206)', width: 1 }} // Added a slight border for crispness
+                    line: {{ color: 'rgb(160, 184, 206)', width: 1 }} 
                 }}
+            }};
+            const layout = {{ 
+                title: plot_title, 
+                margin: {{t:40, b:40, l:50, r:20}} 
             }};
             const config = {{
                 toImageButtonOptions: {{
-                    format: 'svg', // Can be 'png', 'svg', 'jpeg', 'webp'
-                    filename: plot_title.replace(/\s+/g, '_') // Replace spaces with underscores in filenames
+                    format: 'svg', 
+                    filename: plot_title.replace(/\s+/g, '_') 
                 }},
-                displaylogo: false // Hide the Plotly logo from the toolbar
+                displaylogo: false 
             }};
-            Plotly.newPlot(id, [trace], {{ 
-                title: plot_title, 
-                margin: {{t:40, b:40, l:50, r:20}} 
-            }});
+            Plotly.newPlot(id, [trace], layout, config);
         }}
 
         // Draw Insert Size
