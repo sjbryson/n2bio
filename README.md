@@ -13,7 +13,7 @@
 2. **Clone & Build:** Clone the repository, navigate into the directory, and build the binary:
    
 ```
-git clone [https://github.com/sjbryson/n2bio.git](https://github.com/sjbryson/n2bio.git)
+git clone https://github.com/sjbryson/n2bio.git
 cd n2bio
 cargo build --release
 ```
