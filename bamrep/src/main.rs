@@ -725,7 +725,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         results.insert(name, summary);
     }
 
-    // Write JSON Report (This now includes the bin vectors)
+    // Write JSON Report
     let report_file: File = File::create(&args.report)?;
     serde_json::to_writer_pretty(report_file, &results)?;
 
