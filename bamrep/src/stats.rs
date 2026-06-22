@@ -36,8 +36,6 @@ pub struct ReportData {
     pub alignment_stats: HashMap<String, StatSummary>,
 }
 
-
-
 #[derive(Serialize, Default)]
 pub struct HistogramData {
     bin_min: f64,
