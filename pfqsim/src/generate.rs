@@ -6,6 +6,7 @@ use std::thread;
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use rand::rngs::SmallRng;
+use std::time::Instant;
 
 use n2core::fasta::FastaReader;
 use n2core::readers::ReaderType;
@@ -25,6 +26,7 @@ use crate::mutate::{Mutator, MutationStats};
 // ============================================================================
 
 pub fn run(args: GenerateArgs) -> io::Result<()> {
+    let start_time: Instant = Instant::now();
     println!("Generating {} reads from {:?}", args.num_reads, args.fasta);
 
     let read_length: usize = args.length; 
@@ -115,11 +117,11 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
             // E. Format headers
-            let r1_base_id: String = format!("{}:{}:{}:{}:{}:{} 1:N:0:0", 
+            let r1_base_id: String = format!("{}:{}:{}:{}:{}:{}", // cut 1:N:0:0 from id
                 args.genome_code, accession, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, global_read_id
             );
 
-            let r2_base_id: String = format!("{}:{}:{}:{}:{}:{} 2:N:0:0", 
+            let r2_base_id: String = format!("{}:{}:{}:{}:{}:{}", // cut 2:N:0:0 from id
                 args.genome_code, accession, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, global_read_id
             );
 
@@ -149,9 +151,16 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
 
         sender.send(batch).expect("Failed to send batch to writer");
     });
-
+    
     let pairs_written: usize = writer_handle.join().expect("Writer thread panicked")?;
-    println!("Successfully generated and wrote {} pairs.", pairs_written);
+    let duration: std::time::Duration = start_time.elapsed();
+    let summary: serde_json::Value = serde_json::json!({
+        "source_fasta": args.fasta,
+        "total_pairs_generated": pairs_written,
+        "runtime_seconds": duration.as_secs_f64()
+    });
+
+    println!("{}", serde_json::to_string_pretty(&summary).unwrap());
 
     Ok(())
 }

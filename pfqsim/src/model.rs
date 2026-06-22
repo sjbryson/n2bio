@@ -1,7 +1,7 @@
 //! n2bio/pfqsim/src/model.rs
 //! 
 
-use std::io::{self, Error, ErrorKind};
+use std::io::{ self, Error, ErrorKind };
 use std::time::Instant;
 use std::collections::BTreeMap;
 
