@@ -1,9 +1,8 @@
 //! n2core/bamrep/src/report.rs
 //! 
 
-use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::StatSummary;
+use crate::stats::{ ReportData, StatSummary, ReadClassStats };
 
 // ============================================================================
 // Report configuration
@@ -62,13 +61,41 @@ impl ReportConfig {
 // HTML output
 // ============================================================================
 
-pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     
-    let json_data: String = serde_json::to_string(results)?;
+    let json_data: String = serde_json::to_string(report_data)?;
 
-    // Helper to format the top single-column table (Insert Size)
+    // Helper to format the top Global Stats table
+    let r1: &ReadClassStats = &report_data.global_stats.r1;
+    let r2: &ReadClassStats = &report_data.global_stats.r2;
+    let table_global: String = format!(
+        r#"<table>
+            <tr><th>Metric</th><th>R1</th><th>R2</th></tr>
+            <tr><td>Total Reads</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary Mapped</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary MAPQ > 0</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary Concordant</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary Discordant</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary Singletons</td><td>{}</td><td>{}</td></tr>
+            
+            <tr><td colspan="3" style="background-color: #f8f9fa; font-weight: bold; text-align: center;">Multi-Mapping & Ambiguity</td></tr>
+            <tr><td>Secondary/Supplementary Mapped</td><td>{}</td><td>{}</td></tr>
+            <tr><td>MAPQ = 0</td><td>{}</td><td>{}</td></tr>
+        </table>"#,
+        r1.total_reads, r2.total_reads,
+        r1.primary_mapped, r2.primary_mapped,
+        r1.primary_mapq, r2.primary_mapq,
+        r1.concordant_mapped, r2.concordant_mapped,
+        r1.discordant_mapped, r2.discordant_mapped,
+        r1.singletons, r2.singletons,
+        r1.secondary_mapped, r2.secondary_mapped,
+        r1.mapq_0, r2.mapq_0
+    );
+
+
+    // Helper to format the insert size table
     let get_single_table = |name: &str| {
-        let s: &StatSummary = results.get(name).unwrap();
+        let s: &StatSummary = report_data.alignment_stats.get(name).unwrap();
         format!(
             r#"<table>
                 <tr><th>Metric</th><th>Value</th></tr>
@@ -85,8 +112,8 @@ pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &
 
     // Helper to format the combined R1/R2 tables
     let get_combined_table = |base_name: &str, r1_name: &str, r2_name: &str| {
-        let r1: &StatSummary = results.get(r1_name).unwrap();
-        let r2: &StatSummary = results.get(r2_name).unwrap();
+        let r1: &StatSummary = report_data.alignment_stats.get(r1_name).unwrap();
+        let r2: &StatSummary = report_data.alignment_stats.get(r2_name).unwrap();
         format!(
             r#"<table>
                 <tr><th>Metric</th><th>R1</th><th>R2</th></tr>
@@ -144,7 +171,7 @@ pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &
             color: #666; 
             font-size: 0.95em; 
             margin: -10px auto 20px auto;
-            max-width: 800px; 
+            max-width: 900px; 
             line-height: 1.5;
         }}
 
@@ -156,6 +183,13 @@ pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &
 <body>
     <div class="report-container">
         <h1>BAM Alignment Report</h1>
+
+        <div class="divider">Global Metrics</div>
+        <p class="section-desc">Overall sequence counts and mapping classifications for R1 and R2 reads. 
+        Only primary alignments with MAPQ>0 are used for alignment stat distributions.</p>
+        <div style="max-width: 800px; margin: 0 auto 40px auto;">
+            {table_global}
+        </div>
 
         <div class="divider">PE Insert Sizes</div>
         <p class="section-desc">
@@ -249,7 +283,7 @@ pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &
     </div>
 
     <script>
-        const data = {json_data};
+        const data = {json_data}.alignment_stats;
         
         function draw(id, data_key, plot_title) {{
             const s = data[data_key];

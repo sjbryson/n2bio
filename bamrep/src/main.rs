@@ -9,8 +9,8 @@ use rayon::prelude::*;
 
 mod stats;
 mod report;
-use n2core::bam::{ BamReader, BamHeader, BamRecord, BamStats };
-use crate::stats::{ StatSummary, StatsAccumulator };
+use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
+use crate::stats::{ GlobalStats, StatSummary, StatsAccumulator, ReportData };
 
 // ============================================================================
 // Args
@@ -68,10 +68,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_as_al: f64 = 2.0;
     let max_align_prop: f64 = 1.0;
     let max_align_pi: f64 = 100.0;
+    // Struct to collect global stats
+    let mut global_stats: GlobalStats = GlobalStats::default();
     // Closure to extract alignment stats from individual reads
     let mut extract_read_stats = |r: &BamRecord, is_r1: bool| {
         // Route the data to the correct vectors
         let (
+            global,
             mapq_vec, 
             align_score_vec,
             align_len_vec, 
@@ -80,6 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             align_acc_vec,
         ) = if is_r1 {
             (
+                &mut global_stats.r1,
                 &mut stats.r1_mapq,
                 &mut stats.r1_align_score, 
                 &mut stats.r1_align_length, 
@@ -89,6 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         } else {
             (
+                &mut global_stats.r2,
                 &mut stats.r2_mapq,
                 &mut stats.r2_align_score, 
                 &mut stats.r2_align_length, 
@@ -97,18 +102,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut stats.r2_align_accuracy
             )
         };  
-        // If read is unmapped push 0 to each vec
-        //if r.mapq == 0 {
-        //    mapq_vec.push(0 as f64);
-        //    align_score_vec.push(0 as f64);
-        //    align_len_vec.push(0 as f64);
-        //    as_al_vec.push(0 as f64);
-        //    align_prop_vec.push(0 as f64);
-        //    align_acc_vec.push(0 as f64);
-        //}
 
-        // Only push alignment metrics if the read is mapped
-        if r.mapq > 0 {
+        // Collect global_stats
+        global.total_reads += 1;
+
+        if r.mapq == 0 {
+                global.mapq_0 += 1;
+            }
+
+        
+        if r.is_primary() {
+            global.primary_mapped += 1;
+            if r.mapq > 0 {
+                global.primary_mapq +=1;
+            }
+            //if let Some(nh) = r.get_int_tag(b"NH") {
+            //    if nh > 1 {
+            //        global.primary_multi_mapped += 1;
+            //    }
+            //}
+            if r.is_mate_unmapped() {
+                global.singletons += 1;
+            } else if r.is_proper() {
+                global.concordant_mapped += 1;
+            } else {
+                global.discordant_mapped += 1;
+            }
+        } else {
+            global.secondary_mapped += 1;
+        }
+
+        // Only push alignment metrics if the read is mapped and primary
+        if r.mapq > 0 && r.is_primary() {
             mapq_vec.push((r.mapq as f64).min(max_mapq));
             
             if let Some(val) = r.get_int_tag(b"AS") { 
@@ -215,30 +240,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     // Reconstruct the HashMap for JSON serialization
-    let mut results: HashMap<String, StatSummary> = HashMap::new();
+    let mut alignment_results: HashMap<String, StatSummary> = HashMap::new();
     for (name, summary) in results_vec {
-        results.insert(name, summary);
+        alignment_results.insert(name, summary);
     }
+
+    let report_data: ReportData = ReportData {
+        global_stats,
+        alignment_stats: alignment_results,
+    };
 
     // Write JSON Report
     let mut json_path: PathBuf = args.report.clone();
     json_path.set_extension("json"); // Enforces the .json extension
 
     let report_file: File = File::create(&json_path)?;
-    serde_json::to_writer_pretty(report_file, &results)?;
+    serde_json::to_writer_pretty(report_file, &report_data)?;
 
     // Write optional HTML report
     if args.html {
         let mut html_path: PathBuf = args.report.clone();
         html_path.set_extension("html");
 
-        if let Err(e) = report::generate_html_report(&results, &html_path) {
+        if let Err(e) = report::generate_html_report(&report_data, &html_path) {
             eprintln!("Warning: Failed to generate HTML report: {}", e);
         }
     }
 
-
-    
     println!("Analysis complete.");
     println!("Processed {} pairs.", total_pairs);
     println!("Results saved to {:?}", &json_path);

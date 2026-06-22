@@ -116,6 +116,39 @@ impl BamRecord {
 }
 
 // ============================================================================
+// BAM Flags trait and implementation
+// ============================================================================
+
+pub trait BamFlags {
+    fn flag(&self) -> u16;
+    
+    // Bitwise default implementations
+    #[inline] fn is_paired(&self)        -> bool { (self.flag() & 0x0001) != 0 }
+    #[inline] fn is_proper(&self)        -> bool { (self.flag() & 0x0002) != 0 }
+    #[inline] fn is_mapped(&self)        -> bool { (self.flag() & 0x0004) == 0 }
+    #[inline] fn is_unmapped(&self)      -> bool { (self.flag() & 0x0004) != 0 }
+    #[inline] fn is_mate_mapped(&self)   -> bool { (self.flag() & 0x0008) == 0 }
+    #[inline] fn is_mate_unmapped(&self) -> bool { (self.flag() & 0x0008) != 0 }
+    #[inline] fn is_revcomp(&self)       -> bool { (self.flag() & 0x0010) != 0 }
+    #[inline] fn is_mate_revcomp(&self)  -> bool { (self.flag() & 0x0020) != 0 }
+    #[inline] fn is_read1(&self)         -> bool { (self.flag() & 0x0040) != 0 }
+    #[inline] fn is_read2(&self)         -> bool { (self.flag() & 0x0080) != 0 }
+    #[inline] fn is_secondary(&self)     -> bool { (self.flag() & 0x0100) != 0 }
+    #[inline] fn is_supplementary(&self) -> bool { (self.flag() & 0x0800) != 0 }
+    // Derived logical methods
+    #[inline] fn is_primary(&self) -> bool { 
+        !self.is_secondary() && !self.is_supplementary() 
+    }
+}
+
+impl BamFlags for BamRecord {
+    #[inline]
+    fn flag(&self) -> u16 {
+        self.flag
+    }
+}
+
+// ============================================================================
 // BAM stats trait and implementation
 // ============================================================================
 

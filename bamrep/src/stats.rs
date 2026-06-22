@@ -1,12 +1,42 @@
 //! n2core/bamrep/src/stats.rs
 //! 
 use serde::Serialize;
+use std::collections::HashMap;
 
 use crate::report::ReportConfig;
 
 // ============================================================================
 // Stats
 // ============================================================================
+
+// Holds the counts for a single read direction (R1 or R2)
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ReadClassStats {
+    pub total_reads: usize,
+    pub primary_mapped: usize,
+    pub primary_mapq: usize,
+    pub secondary_mapped: usize,
+    pub concordant_mapped: usize,
+    pub discordant_mapped: usize,
+    pub singletons: usize,
+    pub mapq_0: usize,
+}
+
+// Holds the combined R1/R2 global stats
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct GlobalStats {
+    pub r1: ReadClassStats,
+    pub r2: ReadClassStats,
+}
+
+// The new root JSON structure
+#[derive(Serialize)]
+pub struct ReportData {
+    pub global_stats: GlobalStats,
+    pub alignment_stats: HashMap<String, StatSummary>,
+}
+
+
 
 #[derive(Serialize, Default)]
 pub struct HistogramData {
