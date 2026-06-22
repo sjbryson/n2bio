@@ -23,7 +23,7 @@ struct Args {
     #[arg(short = 'b', long)]
     bam: PathBuf,
 
-    /// Output JSON report file
+    /// Report file prefix - creates {report}.json and optional {report}.html
     #[arg(short = 'r', long)]
     report: PathBuf,
 
