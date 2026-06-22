@@ -41,6 +41,10 @@ pub struct ModelArgs {
     /// Optional: Min MAPQ score for filtering alignments for insert size distribution
     #[arg(short = 'q', long, default_value_t = 40)]
     pub mapq: usize,
+
+    /// Optional: Max insert size to use for insert size distribution
+    #[arg(short = 'i', long, default_value_t = 1000)]
+    pub max_ins: usize,
 }
 
 #[derive(Args)]

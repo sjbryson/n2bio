@@ -5,12 +5,10 @@ use std::io::{self, Error, ErrorKind};
 use std::time::Instant;
 use std::collections::BTreeMap;
 
-use n2core::bam::{ BamReader, BamRecord, BamStats };
+use n2core::bam::{ BamReader, BamRecord, BamStats, BamFlags };
 
 use crate::cli::ModelArgs;
-use crate::simstats::{
-    LibraryModel, InsertModel, QualityModel, NormalDistParams, update_qscore_model
-};
+use crate::simstats::{ LibraryModel, InsertModel, QualityModel, NormalDistParams, update_qscore_model };
 
 // ============================================================================
 // Main Runner
@@ -50,7 +48,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
                 let ref_span: i32 = rev.calculate_ref_span().unwrap_or(0) as i32;
                 let insert_size: i32 = (rev.pos + ref_span) - fwd.pos;
                 
-                if insert_size > 0 {
+                if insert_size > 0 && insert_size <= args.max_ins as i32 {
                     *raw_insert_sizes.entry(insert_size).or_insert(0) += 1;
                     *sizes_count += 1;
                 }
@@ -71,9 +69,9 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
             prev_qname = current_record.read_name.clone();
         }
 
-        if current_record.flag & 0x40 != 0 {
+        if current_record.is_read1() {
             r1_record = Some(current_record.clone());
-        } else if current_record.flag & 0x80 != 0 {
+        } else if current_record.is_read2() {
             r2_record = Some(current_record.clone());
         }
     }
