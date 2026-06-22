@@ -19,6 +19,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
     let read_length: usize              = args.length;
     let mut total_pairs: usize          = 0usize;
     let mut insert_sizes_modeled: usize = 0usize;
+    let max_insert_size: i32            = args.max_ins as i32;
     
     // Use temporary BTreeMaps to accumulate the frequencies.
     let mut raw_insert_sizes: BTreeMap<i32, usize> = BTreeMap::new();
@@ -48,7 +49,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
                 let ref_span: i32 = rev.calculate_ref_span().unwrap_or(0) as i32;
                 let insert_size: i32 = (rev.pos + ref_span) - fwd.pos;
                 
-                if insert_size > 0 && insert_size <= args.max_ins as i32 {
+                if insert_size > 0 && insert_size <= max_insert_size {
                     *raw_insert_sizes.entry(insert_size).or_insert(0) += 1;
                     *sizes_count += 1;
                 }
