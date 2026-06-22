@@ -206,7 +206,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
         <div class="divider">MAPQ Distribution</div>
         <p class="section-desc">
             Mapping quality (MAPQ) scores representing the aligner's confidence in the read's origin. 
-            Higher scores indicate greater probability of correct placement. Unaligned reads (MAPQ = 0) are not included.
+            Higher scores indicate greater probability of correct placement. Alignments with MAPQ = 0 are not included.
         </p>
         <div class="grid-row">
             <div id="r1_mapq"></div> {table_mapq} <div id="r2_mapq"></div>
@@ -382,7 +382,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
                         type: 'line',
                         x0: thresh, x1: thresh,
                         y0: 0, y1: 1, yref: 'paper',
-                        line: {{ color: 'red', width: 2, dash: 'dot' }}
+                        line: {{ color: 'red', width: 1, dash: 'dot' }}
                     }}]
                 }};
                 Plotly.relayout(r1_name, line_update);
