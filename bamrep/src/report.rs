@@ -62,10 +62,8 @@ impl ReportConfig {
 // HTML output
 // ============================================================================
 
-pub fn generate_html_report(results: &HashMap<String, StatSummary>, report_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let mut html_path: PathBuf = report_path.clone();
-    html_path.set_extension("html");
-
+pub fn generate_html_report(results: &HashMap<String, StatSummary>, html_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    
     let json_data: String = serde_json::to_string(results)?;
 
     // Helper to format the top single-column table (Insert Size)
