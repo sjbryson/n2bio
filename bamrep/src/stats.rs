@@ -49,7 +49,7 @@ impl GlobalStats {
             if r.is_primary() {
                 mate.primary_mapped += 1;
                 if r.mapq > 0 { mate.primary_mapq += 1; }
-                if r.mapq == 0 { mate.mapq_0 += 1; }
+                if r.mapq == 0 { mate.mapq_0 += 1;}
                 if r.is_mate_unmapped() {
                     mate.singletons += 1;
                 } else if r.is_proper() {
