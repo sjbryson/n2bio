@@ -76,24 +76,23 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
             <tr><td>Total Alignments</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Mapped</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary MAPQ > 0</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Primary MAPQ = 0</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Concordant</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Discordant</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Singletons</td><td>{}</td><td>{}</td></tr>
-            
-            <tr><td colspan="3" style="background-color: #f8f9fa; font-weight: bold; text-align: center;">Multi-Mapping & Ambiguity</td></tr>
             <tr><td>Secondary/Supplementary Mapped</td><td>{}</td><td>{}</td></tr>
-            <tr><td>MAPQ = 0</td><td>{}</td><td>{}</td></tr>
+            
         </table>"#,
         r1.total_reads, r2.total_reads,
         r1.total_unaligned, r2.total_unaligned,
         r1.total_alignments, r2.total_alignments,
         r1.primary_mapped, r2.primary_mapped,
         r1.primary_mapq, r2.primary_mapq,
+        r1.mapq_0, r2.mapq_0,
         r1.concordant_mapped, r2.concordant_mapped,
         r1.discordant_mapped, r2.discordant_mapped,
         r1.singletons, r2.singletons,
         r1.secondary_mapped, r2.secondary_mapped,
-        r1.mapq_0, r2.mapq_0
     );
 
 
