@@ -2,7 +2,7 @@
 //! 
 
 use std::path::PathBuf;
-use crate::stats::{ ReportData, StatSummary, ReadClassStats };
+use crate::stats::{ ReportData, StatSummary, ReadStats };
 
 // ============================================================================
 // Report configuration
@@ -66,8 +66,8 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
     let json_data: String = serde_json::to_string(report_data)?;
 
     // Helper to format the top Global Stats table
-    let r1: &ReadClassStats = &report_data.global_stats.r1;
-    let r2: &ReadClassStats = &report_data.global_stats.r2;
+    let r1: &ReadStats = &report_data.global_stats.r1;
+    let r2: &ReadStats = &report_data.global_stats.r2;
     let table_global: String = format!(
         r#"<table>
             <tr><th>Metric</th><th>R1</th><th>R2</th></tr>

@@ -12,7 +12,7 @@ use crate::report::ReportConfig;
 
 // Holds the counts for a single read direction (R1 or R2)
 #[derive(Serialize, Default, Clone, Debug)]
-pub struct ReadClassStats {
+pub struct ReadStats {
     pub total_reads: usize,        // Total count of each R1 and R2 read
     pub total_unaligned: usize,    // Total R1 or R2 unaligned reads
     pub total_alignments: usize,   // Total R1 or R2 alignments in BAM file
@@ -28,14 +28,14 @@ pub struct ReadClassStats {
 // Holds the combined R1/R2 global stats
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GlobalStats {
-    pub r1: ReadClassStats,
-    pub r2: ReadClassStats,
+    pub r1: ReadStats,
+    pub r2: ReadStats,
 }
 
 impl GlobalStats {
     pub fn update_counts(&mut self, r: &BamRecord) {
         // Route to the correct struct r1 or r2
-        let mate: &mut ReadClassStats = if r.is_read1() {
+        let mate: &mut ReadStats = if r.is_read1() {
             &mut self.r1
         } else if r.is_read2() {
             &mut self.r2
