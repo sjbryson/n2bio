@@ -89,6 +89,9 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
     let batch_size: usize = 10_000;
     let num_batches: usize = (args.num_reads as f64 / batch_size as f64).ceil() as usize;
 
+    // Set min insert size
+    let min_insert_size: usize = read_length + deletion_buffer;
+
     (0..num_batches).into_par_iter().for_each_with(tx, |sender, batch_idx| {
         
         let mut rng: SmallRng = rand::make_rng();
@@ -101,7 +104,10 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             let global_read_id: usize = start_read_id + local_i;
 
             // A. Sample an insert size
-            let insert_size: usize = std::cmp::max(inserts.sample(&mut rng), read_length + deletion_buffer);
+            let mut insert_size: usize = inserts.sample(&mut rng);
+            while insert_size < min_insert_size {
+                insert_size = inserts.sample(&mut rng);
+            }
 
             // B. Grab a slice of the genome equal to the INSERT SIZE
             let (accession, raw_insert_slice) = reference.sample_slice(&mut rng, insert_size, deletion_buffer);
