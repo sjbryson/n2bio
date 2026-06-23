@@ -61,7 +61,7 @@ impl ReportConfig {
 // HTML output
 // ============================================================================
 
-pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, report_name: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     
     let json_data: String = serde_json::to_string(report_data)?;
 
@@ -72,6 +72,8 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
         r#"<table>
             <tr><th>Metric</th><th>R1</th><th>R2</th></tr>
             <tr><td>Total Reads</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Total Unaligned</td><td>{}</td><td>{}</td></tr>
+            <tr><td>Total Alignments</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Mapped</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary MAPQ > 0</td><td>{}</td><td>{}</td></tr>
             <tr><td>Primary Concordant</td><td>{}</td><td>{}</td></tr>
@@ -83,6 +85,8 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
             <tr><td>MAPQ = 0</td><td>{}</td><td>{}</td></tr>
         </table>"#,
         r1.total_reads, r2.total_reads,
+        r1.total_unaligned, r2.total_unaligned,
+        r1.total_alignments, r2.total_alignments,
         r1.primary_mapped, r2.primary_mapped,
         r1.primary_mapq, r2.primary_mapq,
         r1.concordant_mapped, r2.concordant_mapped,
@@ -139,7 +143,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
 <html>
 <head>
     <meta charset="utf-8">
-    <title>BAM Alignment Report</title>
+    <title>BAM Alignment Report: {report_name}</title>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <style>
         body {{ font-family: sans-serif; background-color: #f9f9f9; margin: 0; padding: 20px; }}
@@ -182,7 +186,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
 </head>
 <body>
     <div class="report-container">
-        <h1>BAM Alignment Report</h1>
+        <h1>BAM Alignment Report: {report_name}</h1>
 
         <div class="divider">Global Metrics</div>
         <p class="section-desc">Overall sequence counts and mapping classifications for R1 and R2 reads. 
@@ -404,6 +408,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf) -> Re
 </body>
 </html>
 "#, 
+    report_name = report_name.display().to_string(),
     json_data = json_data,
     table_insert = get_single_table("pe_insert_size"),
     table_mapq = get_combined_table("mapq","r1_mapq", "r2_mapq"),

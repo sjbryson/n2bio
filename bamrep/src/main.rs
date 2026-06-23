@@ -9,7 +9,7 @@ use rayon::prelude::*;
 
 mod stats;
 mod report;
-use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
+use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags };
 use crate::stats::{ GlobalStats, StatSummary, StatsAccumulator, ReportData };
 
 // ============================================================================
@@ -53,133 +53,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setup BamReader
     let mut bam_reader: BamReader = BamReader::open(args.bam.to_str().unwrap())?;
     let _header: BamHeader = bam_reader.read_header()?;
-    // Variables for BAM parsing
+    // Variables for primary alignment pairing
     let mut current_record: BamRecord = BamRecord::default();
     let mut r1_record: Option<BamRecord> = None;
     let mut r2_record: Option<BamRecord> = None;
     let mut prev_qname: Vec<u8> = Vec::new();
-    // Global stats variables
     let mut total_pairs: i32 = 0;
-    let mut stats: StatsAccumulator = StatsAccumulator::default();
-    // Set some max parameter values based on args.max_len
-    let max_mapq: f64 = 60.0;
-    let max_as: f64 = 2.0 * args.max_len as f64;
-    let max_al: f64 = args.max_len as f64;
-    let max_as_al: f64 = 2.0;
-    let max_align_prop: f64 = 1.0;
-    let max_align_pi: f64 = 100.0;
-    // Struct to collect global stats
     let mut global_stats: GlobalStats = GlobalStats::default();
-    // Closure to extract alignment stats from individual reads
-    let mut extract_read_stats = |r: &BamRecord, is_r1: bool| {
-        // Route the data to the correct vectors
-        let (
-            global,
-            mapq_vec, 
-            align_score_vec,
-            align_len_vec, 
-            as_al_vec, 
-            align_prop_vec, 
-            align_acc_vec,
-        ) = if is_r1 {
-            (
-                &mut global_stats.r1,
-                &mut stats.r1_mapq,
-                &mut stats.r1_align_score, 
-                &mut stats.r1_align_length, 
-                &mut stats.r1_as_al, 
-                &mut stats.r1_align_proportion, 
-                &mut stats.r1_align_accuracy
-            )
-        } else {
-            (
-                &mut global_stats.r2,
-                &mut stats.r2_mapq,
-                &mut stats.r2_align_score, 
-                &mut stats.r2_align_length, 
-                &mut stats.r2_as_al, 
-                &mut stats.r2_align_proportion, 
-                &mut stats.r2_align_accuracy
-            )
-        };  
-
-        // Collect global_stats
-        global.total_reads += 1;
-
-        if r.mapq == 0 {
-                global.mapq_0 += 1;
-            }
-
-        
-        if r.is_primary() {
-            global.primary_mapped += 1;
-            if r.mapq > 0 {
-                global.primary_mapq +=1;
-            }
-            //if let Some(nh) = r.get_int_tag(b"NH") {
-            //    if nh > 1 {
-            //        global.primary_multi_mapped += 1;
-            //    }
-            //}
-            if r.is_mate_unmapped() {
-                global.singletons += 1;
-            } else if r.is_proper() {
-                global.concordant_mapped += 1;
-            } else {
-                global.discordant_mapped += 1;
-            }
-        } else {
-            global.secondary_mapped += 1;
-        }
-
-        // Only push alignment metrics if the read is mapped and primary
-        if r.mapq > 0 && r.is_primary() {
-            mapq_vec.push((r.mapq as f64).min(max_mapq));
-            
-            if let Some(val) = r.get_int_tag(b"AS") { 
-                align_score_vec.push((val as f64).min(max_as)); 
-            }
-            if let Some(val) = r.calculate_alignment_length() { 
-                align_len_vec.push((val as f64).min(max_al)); 
-            }
-            if let Some(val) = r.calculate_as_al() { 
-                as_al_vec.push((val as f64).min(max_as_al)); 
-            }
-            if let Some(val) = r.calculate_alignment_proportion() { 
-                align_prop_vec.push((val as f64).min(max_align_prop)); 
-            }
-            if let Some(val) = r.calculate_alignment_accuracy() { 
-                align_acc_vec.push((val as f64).min(max_align_pi)); 
-            }
-        }
-    };
-
-    // Closure to process the full pair
-    let mut process_pair = |r1: &BamRecord, r2: &BamRecord| {
-        extract_read_stats(r1, true);
-        extract_read_stats(r2, false);
-
-        // Mapq filtering and insert size logic - only use good alignments
-        if r1.mapq as usize >= args.min_mapq && r2.mapq as usize >= args.min_mapq {
-            if r1.ref_id == r2.ref_id && r1.ref_id != -1 {
-                let (fwd, rev) = if r1.pos <= r2.pos { (r1, r2) } else { (r2, r1) };
-                let ref_span: i32 = rev.calculate_ref_span().unwrap_or(0) as i32;
-                let insert_size: i32 = (rev.pos + ref_span) - fwd.pos;
-                
-                if insert_size > 0 && insert_size <= args.max_ins as i32 {
-                    stats.pe_insert_size.push(insert_size as f64);
-                }
-            }
-        }
-    };
-
+    let mut alignment_stats: StatsAccumulator = StatsAccumulator::default();
+   
     // Read loop
     while bam_reader.read_record(&mut current_record)? {
+        global_stats.update_counts(&current_record);
+        alignment_stats.update_read_stats(&current_record, args.max_len);
+
         if current_record.read_name != prev_qname {
             if !prev_qname.is_empty() {
                 total_pairs += 1;
+                // Only calculate insert size if valid primary/proper pair for this name
                 if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-                    process_pair(r1, r2);
+                    alignment_stats.update_insert_size(r1, r2, args.min_mapq, args.max_ins as i32);
                 }
             }
             r1_record = None;
@@ -187,19 +80,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             prev_qname = current_record.read_name.clone();
         }
 
-        // FLAG 0x40 = first in pair (R1), FLAG 0x80 = second in pair (R2)
-        if current_record.flag & 0x40 != 0 {
-            r1_record = Some(current_record.clone());
-        } else if current_record.flag & 0x80 != 0 {
-            r2_record = Some(current_record.clone());
+        if current_record.is_primary() && current_record.is_proper() {
+            if current_record.is_read1() {
+                r1_record = Some(current_record.clone());
+            } else if current_record.is_read2() {
+                r2_record = Some(current_record.clone());
+            }
         }
+
     }
 
     // Process final record pair
     if !prev_qname.is_empty() {
         total_pairs += 1;
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-            process_pair(r1, r2);
+            alignment_stats.update_insert_size(r1, r2, args.min_mapq, args.max_ins as i32);
         }
     }
 
@@ -208,23 +103,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-   println!("BAM reading complete. Processed {} pairs. Generating summaries and plots...", total_pairs);
+    //Update GlobalStats with the total_pairs count
+    global_stats.set_total_reads(total_pairs as usize);
+
+    println!("BAM reading complete. Processed {} pairs. Generating summaries and plots...", total_pairs);
 
     // Group all 11 vectors into a list so Rayon can process them concurrently
     let mut stats_to_process: Vec<(&str, &mut Vec<f64>)> = vec![
-        ("pe_insert_size", &mut stats.pe_insert_size),
-        ("r1_mapq", &mut stats.r1_mapq),
-        ("r2_mapq", &mut stats.r2_mapq),
-        ("r1_align_score", &mut stats.r1_align_score),
-        ("r2_align_score", &mut stats.r2_align_score),
-        ("r1_align_length", &mut stats.r1_align_length),
-        ("r2_align_length", &mut stats.r2_align_length),
-        ("r1_as_al", &mut stats.r1_as_al),
-        ("r2_as_al", &mut stats.r2_as_al),
-        ("r1_align_proportion", &mut stats.r1_align_proportion),
-        ("r2_align_proportion", &mut stats.r2_align_proportion),
-        ("r1_align_accuracy", &mut stats.r1_align_accuracy),
-        ("r2_align_accuracy", &mut stats.r2_align_accuracy),
+        ("pe_insert_size", &mut alignment_stats.pe_insert_size),
+        ("r1_mapq", &mut alignment_stats.r1_mapq),
+        ("r2_mapq", &mut alignment_stats.r2_mapq),
+        ("r1_align_score", &mut alignment_stats.r1_align_score),
+        ("r2_align_score", &mut alignment_stats.r2_align_score),
+        ("r1_align_length", &mut alignment_stats.r1_align_length),
+        ("r2_align_length", &mut alignment_stats.r2_align_length),
+        ("r1_as_al", &mut alignment_stats.r1_as_al),
+        ("r2_as_al", &mut alignment_stats.r2_as_al),
+        ("r1_align_proportion", &mut alignment_stats.r1_align_proportion),
+        ("r2_align_proportion", &mut alignment_stats.r2_align_proportion),
+        ("r1_align_accuracy", &mut alignment_stats.r1_align_accuracy),
+        ("r2_align_accuracy", &mut alignment_stats.r2_align_accuracy),
     ];
 
     let max_ins_val: f64 = args.max_ins as f64;
@@ -262,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut html_path: PathBuf = args.report.clone();
         html_path.set_extension("html");
 
-        if let Err(e) = report::generate_html_report(&report_data, &html_path) {
+        if let Err(e) = report::generate_html_report(&report_data, &html_path, &args.report) {
             eprintln!("Warning: Failed to generate HTML report: {}", e);
         }
     }

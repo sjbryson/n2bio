@@ -117,12 +117,12 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
             // E. Format headers
-            let r1_base_id: String = format!("{}:{}:{}:{}:{}:{}", // cut 1:N:0:0 from id
-                args.genome_code, accession, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, global_read_id
+            let r1_base_id: String = format!("{}:{}:{} 1:N:{}:{}:{}",
+                args.prefix, accession, global_read_id, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, 
             );
 
-            let r2_base_id: String = format!("{}:{}:{}:{}:{}:{}", // cut 2:N:0:0 from id
-                args.genome_code, accession, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, global_read_id
+            let r2_base_id: String = format!("{}:{}:{} 2:N:{}:{}:{}",
+                args.prefix, accession, global_read_id, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, 
             );
 
             // F. Generate qualities

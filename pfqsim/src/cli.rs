@@ -78,11 +78,8 @@ pub struct GenerateArgs {
     #[arg(short = 'l', long, default_value_t = 150)]
     pub length: usize,
 
-    /// Genome code for fastq headers
-    #[arg(short = 'g', long)]
-    pub genome_code: String,
-
     /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
+    /// and for read identifiers (e.g. @{prefix}:Accession:Num Subs:Num Ins:Num Del:Read Num)
     #[arg(short = 'p', long)]
     pub prefix: String,
 
