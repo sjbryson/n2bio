@@ -130,7 +130,7 @@ Options:
 ```
 ---
 
-**bamrep/** - Generate a report from a name sorted bam file for an alignment of paired end reads. Optional Html and Svg reports in addition to standard json output of summary stats + histograms for insert size (calculated using alignments that pass user defined max insert size and min mapq values), mapq values, alignment scores, alignment lengths, per base alignments cores, alignment proportions, and alignment percent identities. Html output (--html option) uses plotly, has sliders to check thresholds for filtering alignments, and allows savingindividual plots as png files. The svg (--plot option) is ok, but getting the formatting correct will take some additional work.
+**bamrep/** - Generate a report from a name sorted bam file for an alignment of paired end reads. Optional Html and Svg reports in addition to standard json output of summary stats + histograms for insert size (calculated using alignments that pass user defined max insert size and min mapq values), mapq values, alignment scores, alignment lengths, per base alignments cores, alignment proportions, and alignment percent identities. Html output (--html option) uses plotly, has sliders to check thresholds for filtering alignments, and allows savingindividual plots as svg files.
 
 ```
 Usage: bamrep [OPTIONS] --bam <BAM> --report <REPORT>
@@ -139,7 +139,6 @@ Options:
   -b, --bam <BAM>            Input name-sorted BAM file
   -r, --report <REPORT>      Output JSON report file
       --html                 Generate html plots
-      --plot                 Generate svg plots
   -q, --min-mapq <MIN_MAPQ>  Minimum MAPQ score for insert size calculation [default: 40]
   -i, --max-ins <MAX_INS>    Max insert size to use for summary stats calculation [default: 1000]
   -l, --max-len <MAX_LEN>    Max read length to use [default: 150]
