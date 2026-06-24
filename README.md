@@ -32,7 +32,7 @@ cargo build --release
 
 ### Cli Tools:
 
-**fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2 and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
+**fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 
 **Pipeline example:**
 
@@ -59,7 +59,7 @@ Options:
 
 ---
 
-**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
+**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
 
 **Pipeline example:**
 
