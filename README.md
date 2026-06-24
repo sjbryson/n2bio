@@ -214,7 +214,7 @@ Options:
   ```
   - **pfqsim compose** - ToDo: Use a config file to create a test library from a set of simulated read libraries.
 
-  - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivuty, ROC, etc.
+  - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.
 
   ---
 
