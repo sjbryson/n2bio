@@ -79,7 +79,7 @@ pub struct GenerateArgs {
     pub length: usize,
 
     /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
-    /// and for read identifiers (e.g. @{prefix}:Accession:Num Subs:Num Ins:Num Del:Read Num)
+    /// and for read identifiers (e.g. @{prefix}:Accession::Read Num)
     #[arg(short = 'p', long)]
     pub prefix: String,
 
