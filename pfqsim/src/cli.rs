@@ -36,7 +36,7 @@ pub(crate) struct ModelArgs {
 
     /// Read length to model (default = 150)
     #[arg(short = 'l', long, default_value_t = 150)]
-    pub length: usize,
+    pub read_length: usize,
 
     /// Min MAPQ score for filtering alignments for insert size distribution
     #[arg(short = 'q', long, default_value_t = 40)]
@@ -76,7 +76,7 @@ pub(crate) struct GenerateArgs {
 
     /// Read length to model (default = 150)
     #[arg(short = 'l', long, default_value_t = 150)]
-    pub length: usize,
+    pub read_length: usize,
 
     /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
     /// and for read identifiers (e.g. @{prefix}:Accession::Read Num)

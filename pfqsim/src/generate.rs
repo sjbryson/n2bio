@@ -27,52 +27,42 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let start_time: Instant = Instant::now();
     println!("Generating {} reads from {:?}", args.num_reads, args.fasta);
 
-    let read_length: usize = args.length; 
-    let deletion_buffer: usize = 20; 
+    let read_length: usize = args.read_length; 
+    let deletion_buffer: usize = 20;
     
-    // Assume a max insert size of ~1000, plus the buffer
-    let min_required_length: usize = 1000 + deletion_buffer;
-   
     // 1. Initialize the FastaReader and load the weighted ReferenceGenome
     let ref_reader: FastaReader<ReaderType> = FastaReader::open(args.fasta.to_str().unwrap())?;
-    let reference: ReferenceGenome = ReferenceGenome::load(ref_reader, min_required_length, args.circular)?;
-
+    let reference: ReferenceGenome = ReferenceGenome::load(ref_reader, 1000, args.circular)?;
+    
     // 2. Load model, initialize mutator and samplers
     let model_path: &str = args.model.to_str().ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Model path is not valid UTF-8")
     })?;
-    
     let model: LibraryModel = LibraryModel::from_file(model_path)
         .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
-    
-    // 3. Instantiate components
     let inserts: InsertSize = InsertSize::new(&model.insert_size)
         .map_err(|e| Error::new(ErrorKind::Other, e))?;
     let qualities: QualityScores = QualityScores::new(&model.quality)
         .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let mutator: Mutator = Mutator::new(args.sub_rate, args.indel_rate);
     
-    let mutator = Mutator::new(args.sub_rate, args.indel_rate);
-
-    // 4. Setup global thread pool for Rayon based on user args
+    // 3. Setup global thread pool for Rayon based on user args
     rayon::ThreadPoolBuilder::new()
         .num_threads(args.threads)
         .build_global()
         .unwrap_or_else(|_| ());
 
-    // 5. Create a SINGLE bounded channel for batches of PairedReads
+    // 4. Create a SINGLE bounded channel for batches of PairedReads
     let (tx, rx) = bounded::<Vec<PairedFastqRecord>>(50);
 
-    // 6. Spawn the dedicated Writer Thread
+    // 5. Spawn the dedicated Writer Thread
     let prefix: String = args.prefix.clone();
     let gz_threads: usize = if args.threads > 2 { 2 } else { 1 };
-
     let writer_handle: thread::JoinHandle<Result<usize, Error>> = thread::spawn(move || -> io::Result<usize> {
         let r1_writer: WriterType = WriterType::to_multithreaded_gz(&format!("{}.r1.fq.gz", prefix), gz_threads)?;
         let r2_writer: WriterType = WriterType::to_multithreaded_gz(&format!("{}.r2.fq.gz", prefix), gz_threads)?;
         let mut fastq_writer: PairedFastqWriter<WriterType, WriterType> = PairedFastqWriter::new(r1_writer, r2_writer);
-        
         let mut total_pairs_written: usize = 0;
-
         for read_batch in rx {
             for pair in read_batch {
                 fastq_writer.write_pair(&pair)?; 
@@ -83,14 +73,14 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
         Ok(total_pairs_written)
     });
 
-    // 7. Worker Pool (Rayon) chunking logic
+    // 6. Worker Pool (Rayon) chunking logic
     let batch_size: usize = 10_000;
     let num_batches: usize = (args.num_reads as f64 / batch_size as f64).ceil() as usize;
 
-    // 8. Set min insert size
+    // 7. Set min insert size
     let min_insert_size: usize = read_length + deletion_buffer;
 
-    // 9. Iterate over batches
+    // 8. Iterate over batches
     (0..num_batches).into_par_iter().for_each_with(tx, |sender, batch_idx| {
         
         let mut rng: SmallRng = rand::make_rng();
@@ -157,7 +147,7 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
         sender.send(batch).expect("Failed to send batch to writer");
     });
     
-    // 10. Run summary
+    // 9. Run summary
     let pairs_written: usize = writer_handle.join().expect("Writer thread panicked")?;
     let duration: std::time::Duration = start_time.elapsed();
     let summary: serde_json::Value = serde_json::json!({

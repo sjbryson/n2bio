@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
-// Core Statistical Parameters
+// Normal Distribution Parameters
 // ============================================================================
 
 /// Represents a standard normal distribution profile
@@ -56,7 +56,7 @@ impl NormalDistParams {
 }
 
 // ============================================================================
-// Insert size model
+// Insert size profiler
 // ============================================================================
 
 /// Accumulates insert size frequencies during BAM/SAM profiling.
@@ -81,6 +81,10 @@ impl InsertProfiler {
         }
     }
 }
+
+// ============================================================================
+// Insert size model
+// ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct InsertModel {
@@ -110,7 +114,7 @@ impl InsertSize {
 }
 
 // ============================================================================
-// Quality score model
+// Quality score profiler
 // ============================================================================
 
 #[derive(Debug, Default)]
@@ -162,6 +166,10 @@ impl QualityProfiler {
     }
 }
 
+// ============================================================================
+// Quality score model
+// ============================================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct QualityModel {
     pub(crate) r1_quals: Vec<NormalDistParams>,
@@ -203,7 +211,7 @@ impl QualityScores {
 }
 
 // ============================================================================
-// Library model
+// Library profiler
 // ============================================================================
 
 #[derive(Debug, Default)]
@@ -236,6 +244,10 @@ impl LibraryProfiler {
         }
     }
 }
+
+// ============================================================================
+// Library model
+// ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LibraryModel {

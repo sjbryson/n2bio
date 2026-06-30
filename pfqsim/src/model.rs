@@ -15,7 +15,7 @@ use crate::simstats::{LibraryModel, LibraryProfiler};
 
 pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     let start_time: Instant              = Instant::now();
-    let read_length: usize               = args.length;
+    let read_length: usize               = args.read_length;
     let mut total_pairs: usize           = 0;
     let max_insert_size: i32             = args.max_ins as i32;
     let mut bam_reader: BamReader        = BamReader::open(args.bam.to_str().unwrap())?;
@@ -67,7 +67,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
         }
     }
 
-    // Parse the last record pair in the file
+    // Parse the last record pair in the bam file
     if !prev_qname.is_empty() {
         total_pairs += 1;
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
@@ -75,7 +75,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
         }
     }
 
-    // Check validity using the quality profiler
+    // Check quality profiler fields to see if model::run() worked
     if total_pairs > 0 && profiler.quality.r1_counts.is_empty() {
         return Err(Error::new(
             ErrorKind::InvalidData,

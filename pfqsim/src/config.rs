@@ -17,11 +17,12 @@ pub(crate) struct ConfigRow {
     pub(crate) id: String,
     pub(crate) abundance: f64,
     pub(crate) fasta: PathBuf,
+    pub(crate) genome_length: usize,
     pub(crate) model: PathBuf,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
-    pub(crate) length: usize,
+    pub(crate) read_length: usize,
     pub(crate) r1_fq: Option<PathBuf>,
     pub(crate) r2_fq: Option<PathBuf>,
 }
@@ -58,14 +59,14 @@ pub(crate) struct ManifestRow {
     pub(crate) id: String,
     pub(crate) abundance: f64,
     pub(crate) fasta: PathBuf,
+    pub(crate) genome_length: usize,
     pub(crate) model: PathBuf,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
-    pub(crate) length: usize,
+    pub(crate) read_length: usize,
     pub(crate) r1_fq: Option<PathBuf>,
     pub(crate) r2_fq: Option<PathBuf>,
-    
     // The calculated read allocation
     pub(crate) calculated_reads: usize,
 }
@@ -77,11 +78,12 @@ impl ManifestRow {
             id: row.id,
             abundance: row.abundance,
             fasta: row.fasta,
+            genome_length: row.genome_length,
             model: row.model,
             circular: row.circular,
             sub_rate: row.sub_rate,
             indel_rate: row.indel_rate,
-            length: row.length,
+            read_length: row.read_length,
             r1_fq: row.r1_fq,
             r2_fq: row.r2_fq,
             calculated_reads,
@@ -117,7 +119,7 @@ impl Manifest {
             AbundanceMode::CopyFraction => {
                 // Read allocation is strictly proportional to (copy_abundance * genome_length)
                 let weights: Vec<f64> = config.rows.iter()
-                    .map(|r| r.abundance * r.length as f64)
+                    .map(|r| r.abundance * r.genome_length as f64)
                     .collect();
                 let total_weight: f64 = weights.iter().sum();
                 

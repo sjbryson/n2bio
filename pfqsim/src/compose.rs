@@ -34,7 +34,7 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
                     fasta: row.fasta.clone(),
                     model: row.model.clone(),
                     num_reads: row.calculated_reads,
-                    length: row.length,                 // read_length
+                    read_length: row.read_length,                 // read_length
                     sub_rate: row.sub_rate,
                     indel_rate: row.indel_rate,
                     threads: args.threads,
