@@ -14,7 +14,7 @@ use crate::simstats::{ LibraryModel, InsertModel, QualityModel, NormalDistParams
 // Main Runner
 // ============================================================================
 
-pub fn run(args: ModelArgs) -> io::Result<()> {
+pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     let start_time: Instant             = Instant::now();
     let read_length: usize              = args.length;
     let mut total_pairs: usize          = 0usize;
@@ -118,7 +118,7 @@ pub fn run(args: ModelArgs) -> io::Result<()> {
     };
 
     // Write models .to_file()
-    let out_path = args.output.to_str().ok_or_else(|| {
+    let out_path = args.model.to_str().ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Output path is not valid UTF-8")
     })?;
     

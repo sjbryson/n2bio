@@ -25,7 +25,7 @@ use crate::mutate::{Mutator, MutationStats};
 // Main Runner
 // ============================================================================
 
-pub fn run(args: GenerateArgs) -> io::Result<()> {
+pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let start_time: Instant = Instant::now();
     println!("Generating {} reads from {:?}", args.num_reads, args.fasta);
 
@@ -40,7 +40,7 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
     let reference: ReferenceGenome = ReferenceGenome::load(ref_reader, min_required_length, args.circular)?;
 
     // 2. Load model, initialize mutator and samplers
-    let model_path = args.model.to_str().ok_or_else(|| {
+    let model_path: &str = args.model.to_str().ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Model path is not valid UTF-8")
     })?;
     
@@ -89,9 +89,10 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
     let batch_size: usize = 10_000;
     let num_batches: usize = (args.num_reads as f64 / batch_size as f64).ceil() as usize;
 
-    // Set min insert size
+    // 8. Set min insert size
     let min_insert_size: usize = read_length + deletion_buffer;
 
+    // 9. Iterate over batches
     (0..num_batches).into_par_iter().for_each_with(tx, |sender, batch_idx| {
         
         let mut rng: SmallRng = rand::make_rng();
@@ -119,10 +120,10 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
             let r2_start: usize = raw_insert_slice.len().saturating_sub(read_length + deletion_buffer);
             let mut r2_stats: MutationStats = mutator.mutate(&raw_insert_slice[r2_start..], read_length, &mut rng);
             
-            // Reverse complement Read 2
+            // E. Reverse complement Read 2
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
-            // E. Format headers
+            // F. Format headers
             let r1_base_id: String = format!("{}:{}:{} 1:N:{}:{}:{}",
                 args.prefix, accession, global_read_id, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, 
             );
@@ -131,11 +132,11 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
                 args.prefix, accession, global_read_id, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, 
             );
 
-            // F. Generate qualities
+            // G. Generate qualities
             let r1_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 1);
             let r2_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 2);
 
-            // G. Convert Vec<u8> buffers to Strings
+            // H. Convert Vec<u8> buffers to Strings
             let (r1_seq_str, r1_qual_str, r2_seq_str, r2_qual_str) = unsafe {
                 (
                     String::from_utf8_unchecked(r1_stats.sequence),
@@ -145,7 +146,7 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
                 )
             };
 
-            // H. Package and push to batch
+            // I. Package and push to batch
             let r1_record: FastqRecord<Read1> = FastqRecord::<Read1>::new(r1_base_id, r1_seq_str, r1_qual_str);
             let r2_record: FastqRecord<Read2> = FastqRecord::<Read2>::new(r2_base_id, r2_seq_str, r2_qual_str);
 
@@ -158,6 +159,7 @@ pub fn run(args: GenerateArgs) -> io::Result<()> {
         sender.send(batch).expect("Failed to send batch to writer");
     });
     
+    // 10. Run summary
     let pairs_written: usize = writer_handle.join().expect("Writer thread panicked")?;
     let duration: std::time::Duration = start_time.elapsed();
     let summary: serde_json::Value = serde_json::json!({

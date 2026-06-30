@@ -11,6 +11,7 @@ mod qualities;
 mod simstats;
 mod genome;
 mod mutate;
+mod config;
 
 use std::io;
 use clap::Parser;

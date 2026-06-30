@@ -6,13 +6,13 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "pfqsim", version = "1.0", about = "Fast metagenomic read simulator")]
-pub struct Cli {
+pub(crate) struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }
 
 #[derive(Subcommand)]
-pub enum Commands {
+pub(crate) enum Commands {
     /// Build insert size and Q-score distributions from a BAM file
     Model(ModelArgs),
     /// Generate a simulated paired-read library from a reference FASTA
@@ -24,31 +24,31 @@ pub enum Commands {
 }
 
 #[derive(Args)]
-pub struct ModelArgs {
+pub(crate) struct ModelArgs {
     
     /// Name for the BAM file for modeling insert size and Qscore distributions
     #[arg(short = 'b', long)]
     pub bam: PathBuf,
 
-    /// Name for the JSON model report -> creates {output}.json
-    #[arg(short = 'o', long)]
-    pub output: PathBuf,
+    /// Name for the JSON model report -> creates {model}.json
+    #[arg(short = 'm', long)]
+    pub model: PathBuf,
 
     /// Read length to model (default = 150)
     #[arg(short = 'l', long, default_value_t = 150)]
     pub length: usize,
 
-    /// Optional: Min MAPQ score for filtering alignments for insert size distribution
+    /// Min MAPQ score for filtering alignments for insert size distribution
     #[arg(short = 'q', long, default_value_t = 40)]
     pub mapq: usize,
 
-    /// Optional: Max insert size to use for insert size distribution
+    /// Max insert size to use for insert size distribution
     #[arg(short = 'i', long, default_value_t = 1000)]
     pub max_ins: usize,
 }
 
 #[derive(Args)]
-pub struct GenerateArgs {
+pub(crate) struct GenerateArgs {
     
     /// Path to the JSON model report -> created by pfqsim --model
     #[arg(short = 'm', long)]
@@ -88,24 +88,43 @@ pub struct GenerateArgs {
     pub threads: usize,
 }
 
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq)]
+pub(crate) enum AbundanceMode {
+    /// Calculate abundance as fraction of total reads
+    #[value(name = "reads")]
+    ReadFraction,
+    
+    /// Calculate abundance as fraction of total genome copies
+    #[value(name = "copies")]
+    CopyFraction,
+}
+
 #[derive(Args)]
-pub struct ComposeArgs {
+pub(crate) struct ComposeArgs {
     
     /// Path to a TSV config file 
     #[arg(short = 'c', long)]
     pub config: PathBuf,
 
-
     #[arg(short = 'p', long)]
     pub prefix: PathBuf,
 
+    /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
+    #[arg(short = 'n', long)]
+    pub total_reads: usize,
+
     /// Number of worker threads
     #[arg(short = 't', long)]
-    pub threads: PathBuf,
+    pub threads: usize,
+
+    /// How abundance values should be mathematically interpreted
+    #[arg(long = "abundance-mode", value_enum, default_value_t = AbundanceMode::ReadFraction)]
+    pub abundance_mode: AbundanceMode,
 }
 
 #[derive(Args)]
-pub struct AnalyzeArgs {
+pub(crate) struct AnalyzeArgs {
     
     /// Path to a TSV config file 
     #[arg(short = 'c', long)]

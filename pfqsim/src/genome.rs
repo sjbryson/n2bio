@@ -12,23 +12,23 @@ use n2core::readers::ReaderType;
 // Contig
 // ============================================================================
 
-pub struct Contig {
-    pub id: String,
-    pub seq: Vec<u8>, 
+pub(crate) struct Contig {
+    pub(crate) id: String,
+    pub(crate) seq: Vec<u8>, 
 }
 
 // ============================================================================
 // Reference genome
 // ============================================================================
 
-pub struct ReferenceGenome {
-    pub contigs: Vec<Contig>,
-    pub selector: WeightedIndex<usize>,
+pub(crate) struct ReferenceGenome {
+    pub(crate) contigs: Vec<Contig>,
+    pub(crate) selector: WeightedIndex<usize>,
 }
 
 impl ReferenceGenome {
     /// Loads the FASTA, handles circularity, splits at 'N's, and builds weights
-    pub fn load(
+    pub(crate) fn load(
         reader: FastaReader<ReaderType>, 
         min_length: usize, 
         is_circular: bool,
@@ -41,7 +41,7 @@ impl ReferenceGenome {
             let record: FastaRecord  = record_result?;
             let mut raw_seq: Vec<u8> = record.seq.into_bytes();
 
-            // 1. Handle Circularity BEFORE splitting
+            // 1. Handle Circularity before splitting
             if is_circular && raw_seq.len() >= min_length {
                 let bridge: Vec<u8> = raw_seq[0..min_length].to_vec();
                 raw_seq.extend(bridge);
@@ -79,7 +79,7 @@ impl ReferenceGenome {
     }
 
     /// Randomly selects a contig (weighted by length) and returns the ID and a raw byte slice
-    pub fn sample_slice<'a, R: rand::Rng + ?Sized>(
+    pub(crate) fn sample_slice<'a, R: rand::Rng + ?Sized>(
         &'a self,
         rng: &mut R,
         insert_size: usize,
