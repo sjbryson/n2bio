@@ -118,7 +118,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     };
 
     // Write models .to_file()
-    let out_path = args.model.to_str().ok_or_else(|| {
+    let out_path: &str = args.model.to_str().ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Output path is not valid UTF-8")
     })?;
     
