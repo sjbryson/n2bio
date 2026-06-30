@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 /// Represents a standard normal distribution profile
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NormalDistParams {
-    pub mean: f64,
-    pub std_dev: f64,
+    pub(crate) mean: f64,
+    pub(crate) std_dev: f64,
 }
 
 impl NormalDistParams {
@@ -59,7 +59,7 @@ impl NormalDistParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct InsertModel {
-    pub insert_dist: NormalDistParams,
+    pub(crate) insert_dist: NormalDistParams,
 }
 
 // ============================================================================
@@ -68,8 +68,8 @@ pub(crate) struct InsertModel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct QualityModel {
-    pub r1_quals: Vec<NormalDistParams>,
-    pub r2_quals: Vec<NormalDistParams>,
+    pub(crate) r1_quals: Vec<NormalDistParams>,
+    pub(crate) r2_quals: Vec<NormalDistParams>,
 }
 
 // ============================================================================
@@ -78,8 +78,8 @@ pub(crate) struct QualityModel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LibraryModel {
-    pub insert_size: InsertModel,
-    pub quality: QualityModel,
+    pub(crate) insert_size: InsertModel,
+    pub(crate) quality: QualityModel,
 }
 
 impl LibraryModel {

@@ -5,13 +5,13 @@ use rand::Rng;
 use rand_distr::{ Normal, Distribution };
 use crate::simstats::{ QualityModel, NormalDistParams };
 
-pub struct QualityScores {
-    pub r1_qual: Vec<Normal<f64>>,
-    pub r2_qual: Vec<Normal<f64>>,
+pub(crate) struct QualityScores {
+    pub(crate) r1_qual: Vec<Normal<f64>>,
+    pub(crate) r2_qual: Vec<Normal<f64>>,
 }
 
 impl QualityScores {
-    pub fn new(model: &QualityModel) -> Result<Self, &'static str> {
+    pub(crate) fn new(model: &QualityModel) -> Result<Self, &'static str> {
         let to_normal = |params: &NormalDistParams| {
             let std_dev: f64 = if params.std_dev <= 0.0 { 0.1 } else { params.std_dev };
             Normal::new(params.mean, std_dev).unwrap()
@@ -24,7 +24,7 @@ impl QualityScores {
     }
 
     /// Generates a quality string of ASCII characters for the specified read (1 or 2)
-    pub fn generate<R: Rng>(&self, rng: &mut R, length: usize, read: u8) -> Vec<u8> {
+    pub(crate) fn generate<R: Rng>(&self, rng: &mut R, length: usize, read: u8) -> Vec<u8> {
         let distributions: &Vec<Normal<f64>> = match read {
             1 => &self.r1_qual,
             2 => &self.r2_qual,
