@@ -6,8 +6,6 @@ mod model;
 mod generate;
 mod compose;
 mod analyze;
-mod inserts;
-mod qualities;
 mod simstats;
 mod genome;
 mod mutate;

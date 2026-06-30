@@ -1,6 +1,8 @@
 //! n2bio/pfqsim/src/simstats.rs
 //! 
 
+use rand::Rng;
+use rand_distr::{Normal, Distribution};
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +64,28 @@ pub(crate) struct InsertModel {
     pub(crate) insert_dist: NormalDistParams,
 }
 
+pub(crate) struct InsertSize {
+    dist: Normal<f64>,
+}
+
+impl InsertSize {
+    pub(crate) fn new(params: &InsertModel) -> Result<Self, &'static str> {
+        // Access the nested NormalDistParams fields within InsertModel
+        let mean: f64 = params.insert_dist.mean;
+        let std_dev: f64 = if params.insert_dist.std_dev <= 0.0 { 0.1 } else { params.insert_dist.std_dev };
+        
+        let dist: Normal<f64> = Normal::new(mean, std_dev)
+            .map_err(|_| "Failed to create normal distribution for insert size")?;
+        
+        Ok(Self { dist })
+    }
+
+    /// Samples a random insert size, rounding to the nearest integer
+    pub(crate) fn sample<R: Rng>(&self, rng: &mut R) -> usize {
+        self.dist.sample(rng).round().max(0.0) as usize
+    }
+}
+
 // ============================================================================
 // Quality score model
 // ============================================================================
@@ -70,6 +94,40 @@ pub(crate) struct InsertModel {
 pub(crate) struct QualityModel {
     pub(crate) r1_quals: Vec<NormalDistParams>,
     pub(crate) r2_quals: Vec<NormalDistParams>,
+}
+
+pub(crate) struct QualityScores {
+    pub(crate) r1_qual: Vec<Normal<f64>>,
+    pub(crate) r2_qual: Vec<Normal<f64>>,
+}
+
+impl QualityScores {
+    pub(crate) fn new(model: &QualityModel) -> Result<Self, &'static str> {
+        let to_normal = |params: &NormalDistParams| {
+            let std_dev: f64 = if params.std_dev <= 0.0 { 0.1 } else { params.std_dev };
+            Normal::new(params.mean, std_dev).unwrap()
+        };
+
+        let r1_qual: Vec<Normal<f64>> = model.r1_quals.iter().map(to_normal).collect();
+        let r2_qual: Vec<Normal<f64>> = model.r2_quals.iter().map(to_normal).collect();
+
+        Ok(Self { r1_qual, r2_qual })
+    }
+
+    /// Generates a quality string of ASCII characters for the specified read (1 or 2)
+    pub(crate) fn generate<R: Rng>(&self, rng: &mut R, length: usize, read: u8) -> Vec<u8> {
+        let distributions: &Vec<Normal<f64>> = match read {
+            1 => &self.r1_qual,
+            2 => &self.r2_qual,
+            _ => panic!("Read argument must be 1 or 2"),
+        };
+
+        distributions.iter().take(length).map(|dist| {
+            let q: f64 = dist.sample(rng).round();
+            let clamped_q: u8 = q.clamp(0.0, 41.0) as u8;
+            clamped_q + 33
+        }).collect()
+    }
 }
 
 // ============================================================================

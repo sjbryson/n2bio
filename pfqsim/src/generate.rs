@@ -15,9 +15,7 @@ use n2core::fastq::{FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWri
 use n2core::sequence::DnaSequence; 
 
 use crate::cli::GenerateArgs;
-use crate::simstats::LibraryModel;
-use crate::inserts::InsertSize;
-use crate::qualities::QualityScores;
+use crate::simstats::{ LibraryModel, InsertSize, QualityScores };
 use crate::genome::ReferenceGenome;
 use crate::mutate::{Mutator, MutationStats};
 
