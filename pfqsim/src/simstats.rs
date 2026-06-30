@@ -59,6 +59,29 @@ impl NormalDistParams {
 // Insert size model
 // ============================================================================
 
+/// Accumulates insert size frequencies during BAM/SAM profiling.
+#[derive(Debug, Default)]
+pub(crate) struct InsertProfiler {
+    pub(crate) counts: BTreeMap<i32, usize>,
+    pub(crate) total_modeled: usize,
+}
+
+impl InsertProfiler {
+    
+    /// Records a valid insert size observation
+    pub(crate) fn update(&mut self, size: i32) {
+        *self.counts.entry(size).or_insert(0) += 1;
+        self.total_modeled += 1;
+    }
+
+    /// Compiles the accumulated frequencies into a finalized, static InsertModel
+    pub(crate) fn build(self) -> InsertModel {
+        InsertModel {
+            insert_dist: NormalDistParams::from_frequency_map(&self.counts),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct InsertModel {
     pub(crate) insert_dist: NormalDistParams,
@@ -89,6 +112,55 @@ impl InsertSize {
 // ============================================================================
 // Quality score model
 // ============================================================================
+
+#[derive(Debug, Default)]
+pub(crate) struct QualityProfiler {
+    pub(crate) r1_counts: Vec<BTreeMap<u8, usize>>,
+    pub(crate) r2_counts: Vec<BTreeMap<u8, usize>>,
+}
+
+impl QualityProfiler {
+    
+    /// Updates the positional Q-score distribution for a given read slice (1 or 2).
+    pub(crate) fn update(&mut self, qual: &[u8], read: u8) {
+        let counts: &mut Vec<BTreeMap<u8, usize>> = match read {
+            1 => &mut self.r1_counts,
+            2 => &mut self.r2_counts,
+            _ => panic!("Read argument must be 1 or 2"),
+        };
+
+        if counts.len() < qual.len() {
+            counts.resize_with(qual.len(), BTreeMap::new);
+        }
+        
+        for (pos, &q) in qual.iter().enumerate() {
+            *counts[pos].entry(q).or_insert(0) += 1;
+        }
+    }
+
+    /// Compiles accumulated frequencies into a QualityModel, padding or 
+    /// truncating to match the target read length exactly.
+    pub(crate) fn build(self, read_length: usize) -> QualityModel {
+        let process_q = |counts: &[BTreeMap<u8, usize>]| -> Vec<NormalDistParams> {
+            let mut params: Vec<NormalDistParams> = Vec::with_capacity(read_length);
+            for i in 0..read_length {
+                if i < counts.len() {
+                    params.push(NormalDistParams::from_frequency_map(&counts[i]));
+                } else {
+                    // Padding fallback if the reference BAM read length was shorter than requested
+                    let last_known = params.last().cloned().unwrap_or(NormalDistParams { mean: 30.0, std_dev: 2.0 });
+                    params.push(last_known);
+                }
+            }
+            params
+        };
+
+        QualityModel {
+            r1_quals: process_q(&self.r1_counts),
+            r2_quals: process_q(&self.r2_counts),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct QualityModel {
@@ -134,6 +206,37 @@ impl QualityScores {
 // Library model
 // ============================================================================
 
+#[derive(Debug, Default)]
+pub(crate) struct LibraryProfiler {
+    pub(crate) quality: QualityProfiler,
+    pub(crate) insert_size: InsertProfiler,
+}
+
+impl LibraryProfiler {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    /// Records quality scores for a pair of reads
+    pub(crate) fn add_qualities(&mut self, r1_qual: &[u8], r2_qual: &[u8]) {
+        self.quality.update(r1_qual, 1);
+        self.quality.update(r2_qual, 2);
+    }
+
+    /// Records a valid insert size observation
+    pub(crate) fn add_insert_size(&mut self, size: i32) {
+        self.insert_size.update(size);
+    }
+
+    /// Finalizes and compiles all accumulated data into a LibraryModel
+    pub(crate) fn build(self, read_length: usize) -> LibraryModel {
+        LibraryModel {
+            insert_size: self.insert_size.build(),
+            quality: self.quality.build(read_length),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LibraryModel {
     pub(crate) insert_size: InsertModel,
@@ -155,20 +258,5 @@ impl LibraryModel {
         let writer: std::io::BufWriter<std::fs::File> = std::io::BufWriter::new(file);
         serde_json::to_writer_pretty(writer, self)?;
         Ok(())
-    }
-}
-
-// ============================================================================
-// Helper functions
-// ============================================================================
-
-/// Updates the positional Q-score distribution for a given read.
-/// Used during BAM/SAM profiling to accumulate base frequencies.
-pub(crate) fn update_qscore_model(model: &mut Vec<BTreeMap<u8, usize>>, qual: &[u8]) {
-    if model.len() < qual.len() {
-        model.resize_with(qual.len(), BTreeMap::new);
-    }
-    for (pos, &q) in qual.iter().enumerate() {
-        *model[pos].entry(q).or_insert(0) += 1;
     }
 }
