@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{self, Error, ErrorKind};
 use std::path::Path;
 use serde::{Deserialize, Serialize};
+use serde::de::{self, Deserializer};
 
 use crate::cli::AbundanceMode;
 use crate::genome::ReferenceGenome;
@@ -18,12 +19,32 @@ pub(crate) struct ConfigRow {
     pub(crate) abundance: f64,
     pub(crate) fasta: String,
     pub(crate) model: String,
-    pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
     pub(crate) read_length: usize,
+    #[serde(deserialize_with = "deserialize_flexible_bool")]
+    pub(crate) circular: bool,
     #[serde(skip_deserializing, default)]
     pub(crate) genome_length: usize,
+}
+
+/// Case-insensitive parsing for config boolean declarations 
+/// (e.g., 'T', 't', 'TRUE', 'True', 'true', 'F', 'false', etc.)
+fn deserialize_flexible_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // Extract the raw field content as a temporary string
+    let s: String = Deserialize::deserialize(deserializer)?;
+    
+    match s.trim().to_uppercase().as_str() {
+        "TRUE" | "T" | "YES" | "Y" | "1" => Ok(true),
+        "FALSE" | "F" | "NO" | "N" | "0" => Ok(false),
+        _ => Err(de::Error::custom(format!(
+            "Invalid boolean value '{}'. Expected true/false, T/F, yes/no, or 1/0 (case-insensitive).", 
+            s
+        ))),
+    }
 }
 
 pub(crate) struct Config {
