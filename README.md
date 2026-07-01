@@ -247,6 +247,8 @@ The configuration file requires the following fields:
   - indel_rate: [f64] Random insertion or deletion rate (range: 0-1) to apply to simulated reads.
   - read_length: [int]  Length of simulated reads.
 
+
+
 - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.
 
   ---
