@@ -27,6 +27,30 @@ pub(crate) struct ReferenceGenome {
 }
 
 impl ReferenceGenome {
+    /// Inspects a FASTA file path to calculate total length (without N's) and contig counts 
+    pub(crate) fn parse_fasta_metrics(path: &str) -> io::Result<(usize, usize)> {
+        let reader: FastaReader<ReaderType> = FastaReader::open(path)?;
+        
+        let mut clean_length: usize = 0;
+        let mut contig_count: usize = 0;
+
+        for record_result in reader {
+            let record: FastaRecord = record_result.map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("FASTA parsing error: {}", e))
+            })?;
+            
+            contig_count += 1;
+
+            for &byte in record.seq.as_bytes() {
+                if byte != b'N' && byte != b'n' {
+                    clean_length += 1;
+                }
+            }
+        }
+
+        Ok((clean_length, contig_count))
+    }
+
     /// Loads the FASTA, handles circularity, splits at 'N's, and builds weights
     pub(crate) fn load(
         reader: FastaReader<ReaderType>, 

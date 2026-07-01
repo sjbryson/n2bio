@@ -3,14 +3,17 @@
 
 use std::io;
 use std::fs;
+use std::path::PathBuf;
 use crate::cli::{ComposeArgs, GenerateArgs};
 use crate::config::{Config, Manifest};
 use crate::generate;
 
 pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
-    // 1. Load the input configurations
-    let config: Config = Config::from_tsv(&args.config)?;
-
+    // 1. Load the input configuration, calculate genome lengths, and validate circularity
+    let mut config: Config = Config::from_tsv(&args.config)?;
+    println!("Validating reference FASTA metrics and parsing genome lengths...");
+    config.validate_and_compute_lengths()?;
+    
     // 2. Compute the community read distributions
     let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
 
@@ -37,8 +40,8 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
         // Map configuration settings into the generate command
         let gen_args: GenerateArgs = GenerateArgs {
             prefix: row.id.clone(), 
-            fasta: row.fasta.clone(),
-            model: row.model.clone(),
+            fasta: PathBuf::from(row.fasta.clone()),
+            model: PathBuf::from(row.model.clone()),
             num_reads: row.calculated_reads,
             read_length: row.read_length,
             sub_rate: row.sub_rate,

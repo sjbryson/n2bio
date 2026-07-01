@@ -3,11 +3,11 @@
 
 use std::fs::File;
 use std::io::{self, Error, ErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::AbundanceMode;
-
+use crate::genome::ReferenceGenome;
 // ====================================================================
 // Configuration (Inputs)
 // ====================================================================
@@ -16,8 +16,8 @@ use crate::cli::AbundanceMode;
 pub(crate) struct ConfigRow {
     pub(crate) id: String,
     pub(crate) abundance: f64,
-    pub(crate) fasta: PathBuf,
-    pub(crate) model: PathBuf,
+    pub(crate) fasta: String,
+    pub(crate) model: String,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
@@ -46,6 +46,35 @@ impl Config {
 
         Ok(Self { rows })
     }
+
+    /// Validates all genomes, calculates lengths, and checks circularity constraints.
+    pub(crate) fn validate_and_compute_lengths(&mut self) -> io::Result<()> {
+        for row in &mut self.rows {
+            // Call out to the domain model function to calculate metrics
+            let (clean_length, contig_count) = ReferenceGenome::parse_fasta_metrics(&row.fasta)?;
+
+            if clean_length == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Validation Error [{}] -> FASTA file contains 0 valid non-N bases.", row.id),
+                ));
+            }
+
+            if contig_count > 1 && row.circular {
+                println!(
+                    "[Validation Warning] Genome '{}' contains multiple contigs ({}) but was marked as circular. \
+                     Circularity is only valid for single-contig chromosomes. Forcing circular = false.",
+                    row.id, contig_count
+                );
+                row.circular = false;
+            }
+
+            row.genome_length = clean_length;
+        }
+        
+        Ok(())
+    }
+
 }
 
 // ====================================================================
@@ -57,9 +86,9 @@ pub(crate) struct ManifestRow {
     // Fields preserved from the configuration
     pub(crate) id: String,
     pub(crate) abundance: f64,
-    pub(crate) fasta: PathBuf,
+    pub(crate) fasta: String,
     pub(crate) genome_length: usize,
-    pub(crate) model: PathBuf,
+    pub(crate) model: String,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
