@@ -15,9 +15,9 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
 
     // 3. Save the runtime manifest
-    let tracking_path: String = format!("{}.manifest.tsv", args.prefix);
-    manifest.save_tsv(&tracking_path)?;
-    println!("Execution plan mapped and written to: {}", tracking_path);
+    let manifest_path: String = format!("{}.manifest.tsv", args.prefix);
+    manifest.save_tsv(&manifest_path)?;
+    println!("Library manifest written to: {}", manifest_path);
 
     // 4. Clean up any pre-existing global target files
     let global_r1: String = format!("{}.r1.fq.gz", args.prefix);
