@@ -7,10 +7,10 @@ mod generate;
 mod compose;
 mod analyze;
 mod simstats;
-mod evalstats;
 mod genome;
 mod mutate;
 mod config;
+mod report;
 
 use std::io;
 use clap::Parser;

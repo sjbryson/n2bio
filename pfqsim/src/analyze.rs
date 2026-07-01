@@ -1,39 +1,34 @@
 //! n2bio/pfqsim/src/compose.rs
 //! 
 
-#![allow(unused)]
+use std::io;
+use std::path::{ Path, PathBuf };
+use std::borrow::Cow;
 
-use std::io::{self, BufRead, Write, Error, ErrorKind};
-use std::collections::HashMap;
-use std::fs::File;
+use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
 
 use crate::config::AnalyzeConfig;
 use crate::cli::AnalyzeArgs;
-use crate::evalstats::GlobalEvaluator;
-use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags };
+use crate::report::{ AnalyzeReportData, MetricPayload, generate_evaluation_report };
 
     
 pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
-    // 1. Read config
-    println!("Loading analysis baseline configurations: {}", args.manifest);
+    // Read config
+    println!("Loading benchmark baseline configuration: {}", args.manifest);
     let config: AnalyzeConfig = AnalyzeConfig::from_tsv(&args.manifest)?;
 
-    // 2. Set up read-to-target map and get total read counts
-    let mut target_to_source: HashMap<String, String> = HashMap::new();
-    let mut total_expected: usize = 0;
+    // Total simulated inputs to calibrate baseline False Negatives
+    let total_expected: usize = config.rows.iter().map(|row| row.reads).sum();
 
-    for row in &config.rows {
-        target_to_source.insert(row.target.clone(), row.id.clone());
-        total_expected += row.reads;
-    }
-
-    let mut evaluator: GlobalEvaluator = GlobalEvaluator {
-        total_expected_simulated: total_expected,
-        ..Default::default()
+    let mut report_data: AnalyzeReportData = AnalyzeReportData {
+        report_name: args.output.clone(),
+        total_expected_pairs: total_expected,
+        total_observed_pairs: 0,
+        positives: MetricPayload::default(),
+        negatives: MetricPayload::default(),
     };
 
-    // 3. Initiate BAM Parser Loop
-    println!("Evaluating BAM alignment pairs: {}", args.bam.display());
+    println!("Processing name-sorted BAM tracking pipeline: {}", args.bam.display());
     let mut bam_reader: BamReader = BamReader::open(args.bam.to_str().unwrap())?;
     let header: BamHeader = bam_reader.read_header()?;
 
@@ -46,7 +41,8 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         if current_record.read_name != prev_qname {
             if !prev_qname.is_empty() {
                 if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-                    evaluator.evaluate_pair(&r1, &r2, &header, &target_to_source);
+                    report_data.total_observed_pairs += 1;
+                    evaluate_and_accumulate_pair(&r1, &r2, &header, &mut report_data);
                 }
             }
             r1_record = None;
@@ -54,8 +50,7 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
             prev_qname = current_record.read_name.clone();
         }
 
-        // Just use primary alignments 
-        if current_record.is_primary() { //&& current_record.is_proper() { 
+        if current_record.is_primary() && current_record.is_proper() {
             if current_record.is_read1() {
                 r1_record = Some(current_record.clone());
             } else if current_record.is_read2() {
@@ -64,21 +59,83 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         }
     }
 
-    // Capture the trailing record pair remaining inside buffer streams
+    // Process final records
     if !prev_qname.is_empty() {
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-            evaluator.evaluate_pair(&r1, &r2, &header, &target_to_source);
+            report_data.total_observed_pairs += 1;
+            evaluate_and_accumulate_pair(&r1, &r2, &header, &mut report_data);
         }
     }
 
-    // Print summary snapshot of metrics gathered so far
-    println!("------------------------------------------------------------");
-    println!("Analysis Complete!");
-    println!("Simulated Ground Truth Pairs : {}", evaluator.total_expected_simulated);
-    println!("Observed BAM Primary Pairs   : {}", evaluator.total_observed_pairs);
-    println!("True Positive Data points    : {}", evaluator.positives.mapq.len());
-    println!("False Positive Data points   : {}", evaluator.negatives.mapq.len());
-    println!("------------------------------------------------------------");
+    // Output target creation rules
+    let mut out_html_path: PathBuf = Path::new(&args.output).to_path_buf();
+    if out_html_path.extension().is_none() {
+        out_html_path.set_extension("html");
+    }
 
+    println!("Processing metric data vectors and writing HTML Report dashboard...");
+    generate_evaluation_report(&mut report_data, &out_html_path)?;
+    
+    println!("Evaluation completed successfully. Report dashboard ready at: {}", out_html_path.display());
     Ok(())
+}
+
+/// Determines if a pair matches the ground-truth assignment and moves scores into the appropriate target vectors
+fn evaluate_and_accumulate_pair(
+    r1: &BamRecord,
+    r2: &BamRecord,
+    header: &BamHeader,
+    report_data: &mut AnalyzeReportData,
+) {
+    // Get read name (query)
+    let mut name_bytes: &[u8] = &r1.read_name[..];
+    if let Some(&b'\0') = name_bytes.last() {
+        name_bytes = &name_bytes[..name_bytes.len() - 1];
+    }
+    let qname_str: Cow<'_, str> = String::from_utf8_lossy(name_bytes);
+
+    // Parse the read name - "@id:accession:read_number"
+    let mut tokens: std::str::Split<'_, char> = qname_str.split(':');
+    let _source_id: &str = match tokens.next() {
+        Some(id) => id,
+        None => return, // Malformed name string, skip
+    };
+    let true_accession: &str = match tokens.next() {
+        Some(acc) => acc,
+        None => return, // Malformed name string, skip
+    };
+
+    // Get the alignment target name
+    if r1.ref_id < 0 || (r1.ref_id as usize) >= header.references.len() {
+        return; 
+    }
+    let mapped_target_accession: &String = &header.references[r1.ref_id as usize].name;
+
+    // Evaluate alignment
+    let target_pool: &mut MetricPayload = if true_accession == mapped_target_accession {
+        &mut report_data.positives
+    } else {
+        &mut report_data.negatives
+    };
+
+    // Append alignment data profiles into vectors
+    for record in &[r1, r2] {
+        target_pool.mapq.push(record.mapq as f64);
+        
+        if let Some(val) = record.get_int_tag(b"AS") {
+            target_pool.align_score.push(val as f64);
+        }
+        if let Some(val) = record.calculate_alignment_length() {
+            target_pool.align_length.push(val as f64);
+        }
+        if let Some(val) = record.calculate_as_al() {
+            target_pool.as_al.push(val as f64);
+        }
+        if let Some(val) = record.calculate_alignment_proportion() {
+            target_pool.align_proportion.push(val as f64);
+        }
+        if let Some(val) = record.calculate_alignment_accuracy() {
+            target_pool.align_accuracy.push(val as f64);
+        }
+    }
 }

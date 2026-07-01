@@ -208,7 +208,6 @@ impl Manifest {
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct AnalyzeRow {
     pub(crate) id: String,     // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
-    pub(crate) target: String, // E.g., "NC_000913.3" -> matches BAM reference name
     pub(crate) reads: usize,   // The calculated read allocation from compose step
 }
 
