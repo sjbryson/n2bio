@@ -27,12 +27,12 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
 
     // 5. Execute the manifest actions sequentially, appending sim reads to the global files
     for row in &manifest.rows {
+        println!("Simulating {} reads for genome: {}", row.calculated_reads, row.id);
+        
         if row.calculated_reads == 0 { 
             continue; 
         }
-
-        println!("Simulating {} reads for genome: {}", row.calculated_reads, row.id);
-
+        
         // Map configuration settings into the generate command
         let gen_args: GenerateArgs = GenerateArgs {
             prefix: row.id.clone(), 
