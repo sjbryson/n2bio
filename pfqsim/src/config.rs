@@ -22,8 +22,10 @@ pub(crate) struct ConfigRow {
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
     pub(crate) read_length: usize,
+    
     #[serde(deserialize_with = "deserialize_flexible_bool")]
     pub(crate) circular: bool,
+    
     #[serde(skip_deserializing, default)]
     pub(crate) genome_length: usize,
 }
