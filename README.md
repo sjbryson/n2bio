@@ -213,10 +213,42 @@ Options:
   -t, --threads <THREADS>        Number of worker threads
   -h, --help                     Print help
   ```
-  - **pfqsim compose** - ToDo: Use a config file to create a test library from a set of simulated read libraries.
+- **pfqsim compose** - Use a config file to create a test library from a set of genome fastas. 
+```
+Usage: pfqsim compose [OPTIONS] --config <CONFIG> --prefix <PREFIX> --total-reads <TOTAL_READS> --threads <THREADS>
 
-  - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.
+Options:
+  -c, --config <CONFIG>
+          Path to a TSV config file
+  -p, --prefix <PREFIX>
+          Prefix for the manifest tsv and both simulated reads (R1 & R2) files
+  -n, --total-reads <TOTAL_READS>
+          Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
+  -t, --threads <THREADS>
+          Number of worker threads
+      --abundance-mode <ABUNDANCE_MODE> [default: reads]
+          How abundance values should be mathematically interpreted
+          Possible values:
+          - reads:  Calculate abundance as fraction of total reads
+          - copies: Calculate abundance as fraction of total genome copies
+  -h, --help
+          Print help (see a summary with '-h')
+'''
+
+The configuration file requires the following fields:
+
+  - id: [String]  This will be incorporated into the sequence identifier for all reads generated from each row's genome. 
+  - abundance: [f64]  Relative abundance of total reads (range: 0-1) to generate for each row's genome. Used to calculate the number of reads to generate for each row - calculation based on proprtion of total reads (default abundance mode "reads") or proportion of genome copies (abundance mode "copies")
+  - fasta: [Path] Path to the genome fasta for this row.
+  - genome_length: [int]  Size of the reference genome in each row in bases.
+  - model: [Path] Path to the model.json file (created with pfqsim model) to use for each genome.
+  - circular: [bool]  Should the genome in this row be circularized before read generation. Only works with single contig genomes.
+  - sub_rate: [f64] Substitution rate (range: 0-1) to apply to simulated reads.
+  - indel_rate: [f64] Random insertion or deletion rate (range: 0-1) to apply to simulated reads.
+  - read_length: [int]  Length of simulated reads.
+
+- **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.
 
   ---
 
-  **xbag/** - Very experimental code for building nucleotide variation graphs from a set of closely related (e.g. strain/species) genomes.
+**xbag/** - Very experimental code for building nucleotide variation graphs from a set of closely related (e.g. strain/species) genomes.

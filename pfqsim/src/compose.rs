@@ -19,7 +19,8 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     manifest.save_tsv(&manifest_path)?;
     println!("Library manifest written to: {}", manifest_path);
 
-    // 4. Clean up any pre-existing global target files
+    // 4. Overwrite behavior - delete pre-existing r1 and r2 fastq
+    //    Could change to raise overwrite warning...
     let global_r1: String = format!("{}.r1.fq.gz", args.prefix);
     let global_r2: String = format!("{}.r2.fq.gz", args.prefix);
     let _ = fs::remove_file(&global_r1);
