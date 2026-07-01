@@ -240,12 +240,13 @@ The configuration file requires the following fields:
     - id: [String]  This will be incorporated into the sequence identifier for all reads generated from each row's genome. 
     - abundance: [f64]  Relative abundance of total reads (range: 0-1) to generate for each row's genome. Used to calculate the number of reads to generate for each row - calculation based on proprtion of total reads (default abundance mode "reads") or proportion of genome copies (abundance mode "copies")
     - fasta: [Path] Path to the genome fasta for this row.
-    - genome_length: [int]  Size of the reference genome in each row in bases.
     - model: [Path] Path to the model.json file (created with pfqsim model) to use for each genome.
     - circular: [bool]  Should the genome in this row be circularized before read generation. Only works with single contig genomes.
     - sub_rate: [f64] Substitution rate (range: 0-1) to apply to simulated reads.
     - indel_rate: [f64] Random insertion or deletion rate (range: 0-1) to apply to simulated reads.
     - read_length: [int]  Length of simulated reads.
+
+A validation step calculates all genome sizes for abundance calculations and forces circular=false for any multi contig genome fasta.
 <br>
 
 - **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.

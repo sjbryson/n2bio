@@ -17,12 +17,13 @@ pub(crate) struct ConfigRow {
     pub(crate) id: String,
     pub(crate) abundance: f64,
     pub(crate) fasta: PathBuf,
-    pub(crate) genome_length: usize,
     pub(crate) model: PathBuf,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
     pub(crate) read_length: usize,
+    #[serde(skip_deserializing, default)]
+    pub(crate) genome_length: usize,
 }
 
 pub(crate) struct Config {
