@@ -3,10 +3,12 @@
 
 use std::io::{self, Error, ErrorKind};
 use std::thread;
+use std::fs::OpenOptions;
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use rand::rngs::SmallRng;
 use std::time::Instant;
+use std::path::PathBuf;
 
 use n2core::fasta::FastaReader;
 use n2core::readers::ReaderType;
@@ -56,11 +58,33 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let (tx, rx) = bounded::<Vec<PairedFastqRecord>>(50);
 
     // 5. Spawn the dedicated Writer Thread
-    let prefix: String = args.prefix.clone();
+    let string_path: &String = if args.append_mode {
+        args.append_path.as_ref().expect("Error: append_mode is true but no append_path was provided!")
+    } else {
+        &args.prefix
+    };
+    let base_path: PathBuf = PathBuf::from(string_path);
+    let r1_path: String = format!("{}.r1.fq.gz", base_path.display());
+    let r2_path: String = format!("{}.r2.fq.gz", base_path.display());
+    
+    let r1_file: std::fs::File = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(args.append_mode)
+        .truncate(!args.append_mode) 
+        .open(&r1_path)?;
+
+    let r2_file: std::fs::File = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(args.append_mode)
+        .truncate(!args.append_mode)
+        .open(&r2_path)?;
+
     let gz_threads: usize = if args.threads > 2 { 2 } else { 1 };
     let writer_handle: thread::JoinHandle<Result<usize, Error>> = thread::spawn(move || -> io::Result<usize> {
-        let r1_writer: WriterType = WriterType::to_multithreaded_gz(&format!("{}.r1.fq.gz", prefix), gz_threads)?;
-        let r2_writer: WriterType = WriterType::to_multithreaded_gz(&format!("{}.r2.fq.gz", prefix), gz_threads)?;
+        let r1_writer: WriterType = WriterType::to_multithreaded_gz_from_file(r1_file, gz_threads)?;
+        let r2_writer: WriterType = WriterType::to_multithreaded_gz_from_file(r2_file, gz_threads)?;
         let mut fastq_writer: PairedFastqWriter<WriterType, WriterType> = PairedFastqWriter::new(r1_writer, r2_writer);
         let mut total_pairs_written: usize = 0;
         for read_batch in rx {

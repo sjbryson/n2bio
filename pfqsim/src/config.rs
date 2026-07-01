@@ -23,8 +23,6 @@ pub(crate) struct ConfigRow {
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
     pub(crate) read_length: usize,
-    pub(crate) r1_fq: Option<PathBuf>,
-    pub(crate) r2_fq: Option<PathBuf>,
 }
 
 pub(crate) struct Config {
@@ -65,8 +63,6 @@ pub(crate) struct ManifestRow {
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
     pub(crate) read_length: usize,
-    pub(crate) r1_fq: Option<PathBuf>,
-    pub(crate) r2_fq: Option<PathBuf>,
     // The calculated read allocation
     pub(crate) calculated_reads: usize,
 }
@@ -84,8 +80,6 @@ impl ManifestRow {
             sub_rate: row.sub_rate,
             indel_rate: row.indel_rate,
             read_length: row.read_length,
-            r1_fq: row.r1_fq,
-            r2_fq: row.r2_fq,
             calculated_reads,
         }
     }

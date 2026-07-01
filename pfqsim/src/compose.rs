@@ -2,10 +2,9 @@
 //! 
 
 use std::io;
-use std::path::PathBuf;
-
-use crate::cli::{ ComposeArgs, GenerateArgs };
-use crate::config::{ Config, Manifest };
+use std::fs;
+use crate::cli::{ComposeArgs, GenerateArgs};
+use crate::config::{Config, Manifest};
 use crate::generate;
 
 pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
@@ -15,41 +14,46 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     // 2. Compute the community read distributions
     let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
 
-    // 3. Save the runtime manifest
-    let tracking_path: String = format!("{}_manifest.tsv", args.prefix.display());
+    // 3. Save the runtime manifest to your streamlined path format
+    let tracking_path: String = format!("{}.manifest.tsv", args.prefix);
     manifest.save_tsv(&tracking_path)?;
     println!("Execution plan mapped and written to: {}", tracking_path);
 
-    // 4. Execute the manifest actions sequentially
-    for row in &manifest.rows {
-        if row.calculated_reads == 0 { continue; }
+    // 4. Clean up any pre-existing global target files to avoid muddying data
+    let global_r1: String = format!("{}.r1.fq.gz", args.prefix);
+    let global_r2: String = format!("{}.r2.fq.gz", args.prefix);
+    let _ = fs::remove_file(&global_r1);
+    let _ = fs::remove_file(&global_r2);
 
-        let (r1_path, r2_path) = match (&row.r1_fq, &row.r2_fq) {
-            (Some(r1), Some(r2)) if r1.exists() && r2.exists() => {
-                (r1.clone(), r2.clone())
-            }
-            _ => {
-                let out_prefix: String = format!("{}_sim", row.id);
-                let gen_args: GenerateArgs = GenerateArgs {
-                    fasta: row.fasta.clone(),
-                    model: row.model.clone(),
-                    num_reads: row.calculated_reads,
-                    read_length: row.read_length,                 // read_length
-                    sub_rate: row.sub_rate,
-                    indel_rate: row.indel_rate,
-                    threads: args.threads,
-                    prefix: out_prefix.clone(),
-                    circular: row.circular,
-                };
-                generate::run(gen_args)?;
-                
-                (PathBuf::from(format!("{}.r1.fq.gz", out_prefix)), 
-                 PathBuf::from(format!("{}.r2.fq.gz", out_prefix)))
-            }
+    // 5. Execute the manifest actions sequentially, streaming to the global files
+    for row in &manifest.rows {
+        if row.calculated_reads == 0 { 
+            continue; 
+        }
+
+        println!("Simulating {} reads for genome: {}", row.calculated_reads, row.id);
+
+        // Map configuration settings cleanly into the generation pipeline
+        let gen_args: GenerateArgs = GenerateArgs {
+            prefix: row.id.clone(), 
+            fasta: row.fasta.clone(),
+            model: row.model.clone(),
+            num_reads: row.calculated_reads,
+            read_length: row.read_length,
+            sub_rate: row.sub_rate,
+            indel_rate: row.indel_rate,
+            threads: args.threads,
+            circular: row.circular,
+            append_mode: true,
+            append_path: Some(args.prefix.clone()), 
         };
-        
-        // TODO Step 5: Queue these paths into your upcoming master mixer/shuffler loop!
+
+        generate::run(gen_args)?;
     }
+
+    println!("De novo simulation complete! Library files saved to:");
+    println!("  R1 -> {}", global_r1);
+    println!("  R2 -> {}", global_r2);
 
     Ok(())
 }

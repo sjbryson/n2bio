@@ -86,6 +86,13 @@ pub(crate) struct GenerateArgs {
     /// Number of worker threads
     #[arg(short = 't', long)]
     pub threads: usize,
+
+    #[arg(skip)]
+    pub append_path: Option<String>,
+
+    #[arg(skip)]
+    pub append_mode: bool,
+
 }
 
 
@@ -107,8 +114,9 @@ pub(crate) struct ComposeArgs {
     #[arg(short = 'c', long)]
     pub config: PathBuf,
 
+    /// Prefix for the manifest tsv and both simulated reads (R1 & R2) files 
     #[arg(short = 'p', long)]
-    pub prefix: PathBuf,
+    pub prefix: String,
 
     /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
     #[arg(short = 'n', long)]

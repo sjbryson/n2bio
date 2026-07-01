@@ -87,6 +87,15 @@ impl WriterType {
             
         Ok(WriterType::MultiGz(Box::new(par_writer)))
     }
+
+     /// Multi-threaded gzip writer.
+    pub fn to_multithreaded_gz_from_file(file: std::fs::File, threads: usize) -> io::Result<Self> {
+        let par_writer: Box<dyn ZWriter> = ZBuilder::<Gzip, _>::new()
+            .num_threads(threads)
+            .from_writer(file);
+            
+        Ok(WriterType::MultiGz(Box::new(par_writer)))
+    }
 }
 
 // ============================================================================
