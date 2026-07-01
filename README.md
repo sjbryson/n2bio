@@ -233,7 +233,7 @@ Options:
           - copies: Calculate abundance as fraction of total genome copies
   -h, --help
           Print help (see a summary with '-h')
-'''
+```
 
 The configuration file requires the following fields:
 
