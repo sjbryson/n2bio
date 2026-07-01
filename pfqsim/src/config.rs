@@ -1,6 +1,8 @@
 //! n2bio/pfqsim/src/config.rs
 //! 
 
+#![allow(unused)]
+
 use std::fs::File;
 use std::io::{self, Error, ErrorKind};
 use std::path::Path;
@@ -9,9 +11,10 @@ use serde::de::{self, Deserializer};
 
 use crate::cli::AbundanceMode;
 use crate::genome::ReferenceGenome;
-// ====================================================================
+
+// ============================================================================
 // Configuration (Inputs)
-// ====================================================================
+// ============================================================================
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct ConfigRow {
@@ -100,11 +103,11 @@ impl Config {
 
 }
 
-// ====================================================================
+// ============================================================================
 // Manifest (Output)
-// ====================================================================
+// ============================================================================
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct ManifestRow {
     // Fields preserved from the configuration
     pub(crate) id: String,
@@ -197,3 +200,36 @@ impl Manifest {
         Ok(())
     }
 }
+
+// ============================================================================
+// Analyze config - based on Manifest - includes "target" field
+// ============================================================================
+
+#[derive(Deserialize, Debug, Clone)]
+pub(crate) struct AnalyzeRow {
+    pub(crate) id: String,     // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
+    pub(crate) target: String, // E.g., "NC_000913.3" -> matches BAM reference name
+    pub(crate) reads: usize,   // The calculated read allocation from compose step
+}
+
+pub(crate) struct AnalyzeConfig {
+    pub(crate) rows: Vec<AnalyzeRow>,
+}
+
+impl AnalyzeConfig {
+    pub(crate) fn from_tsv<P: AsRef<std::path::Path>>(path: P) -> io::Result<Self> {
+        let file: File = File::open(path)?;
+        let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_reader(file);
+
+        let mut rows: Vec<AnalyzeRow> = Vec::new();
+        for result in rdr.deserialize() {
+            let row: AnalyzeRow = result.map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+            rows.push(row);
+        }
+        Ok(Self { rows })
+    }
+}
+
+

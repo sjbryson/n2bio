@@ -1,7 +1,7 @@
 //! n2bio/pfqsim/src/cli.rs
 //! 
 
-use clap::{ Args, Parser, Subcommand };
+use clap::{ Args, Parser, Subcommand, ArgGroup };
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -131,20 +131,19 @@ pub(crate) struct ComposeArgs {
     pub abundance_mode: AbundanceMode,
 }
 
-#[derive(Args)]
+#[derive(Parser, Debug, Clone)]
+#[command(group(ArgGroup::new("input").required(true).args(["bam", "sam"]),))]
 pub(crate) struct AnalyzeArgs {
     
-    /// Path to a TSV config file 
-    #[arg(short = 'c', long)]
-    pub config: PathBuf,
+    /// Path to the manifest.tsv generated during the compose step
+    #[arg(short = 'm', long)]
+    pub manifest: String,
 
-    /// Name of the BAM file for analyzing
+    /// Path to an input BAM file to evaluate
     #[arg(short = 'b', long)]
     pub bam: PathBuf,
 
-    /// Name for the analysis report
-    #[arg(short = 'o', long)]
-    pub output: PathBuf,
-
-    // ToDo: option for stdin sam input
+    /// Output path prefix for the generated HTML evaluation report
+    #[arg(short = 'o', long, default_value = "pfqsim_report")]
+    pub output: String,
 }

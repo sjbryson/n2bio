@@ -7,6 +7,7 @@ mod generate;
 mod compose;
 mod analyze;
 mod simstats;
+mod evalstats;
 mod genome;
 mod mutate;
 mod config;
