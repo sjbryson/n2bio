@@ -14,18 +14,18 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     // 2. Compute the community read distributions
     let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
 
-    // 3. Save the runtime manifest to your streamlined path format
+    // 3. Save the runtime manifest
     let tracking_path: String = format!("{}.manifest.tsv", args.prefix);
     manifest.save_tsv(&tracking_path)?;
     println!("Execution plan mapped and written to: {}", tracking_path);
 
-    // 4. Clean up any pre-existing global target files to avoid muddying data
+    // 4. Clean up any pre-existing global target files
     let global_r1: String = format!("{}.r1.fq.gz", args.prefix);
     let global_r2: String = format!("{}.r2.fq.gz", args.prefix);
     let _ = fs::remove_file(&global_r1);
     let _ = fs::remove_file(&global_r2);
 
-    // 5. Execute the manifest actions sequentially, streaming to the global files
+    // 5. Execute the manifest actions sequentially, appending sim reads to the global files
     for row in &manifest.rows {
         if row.calculated_reads == 0 { 
             continue; 
@@ -33,7 +33,7 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
 
         println!("Simulating {} reads for genome: {}", row.calculated_reads, row.id);
 
-        // Map configuration settings cleanly into the generation pipeline
+        // Map configuration settings into the generate command
         let gen_args: GenerateArgs = GenerateArgs {
             prefix: row.id.clone(), 
             fasta: row.fasta.clone(),
@@ -51,7 +51,7 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
         generate::run(gen_args)?;
     }
 
-    println!("De novo simulation complete! Library files saved to:");
+    println!("Simulation complete! {} paired reads saved to:", args.total_reads);
     println!("  R1 -> {}", global_r1);
     println!("  R2 -> {}", global_r2);
 
