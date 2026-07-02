@@ -22,20 +22,29 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
     println!("Loading reference mapping classifications: {}", args.reference_map);
     let reference_map: HashMap<String, String> = load_reference_map(args.reference_map)?;
 
-    // Total simulated inputs to calibrate baseline False Negatives.
-    // Negative control reads are safely excluded from this pool.
-    let total_expected: usize = config.rows
+    // Total expected targets (excluding negative controls)
+    let total_expected_positives: usize = config.rows
         .iter()
         .filter(|row| !row.keyword.eq_ignore_ascii_case("negative"))
-        .map(|row| row.reads)
+        .map(|row| row.calculated_reads)
         .sum();
 
-    let mut report_data: AnalyzeReportData = AnalyzeReportData {
+    // Total expected negative controls
+    let total_expected_negatives: usize = config.rows
+        .iter()
+        .filter(|row| row.keyword.eq_ignore_ascii_case("negative"))
+        .map(|row| row.calculated_reads)
+        .sum();
+
+    // Pass them both into the payload
+    let mut report_data = AnalyzeReportData {
         report_name: args.output.clone(),
-        total_expected_pairs: total_expected,
+        total_expected_pairs: total_expected_positives,
+        total_expected_negative_pairs: total_expected_negatives,
         total_observed_pairs: 0,
         positives: MetricPayload::default(),
-        negatives: MetricPayload::default(),
+        negatives_control: MetricPayload::default(),
+        negatives_cross: MetricPayload::default(),
     };
 
     println!("Processing name-sorted BAM tracking pipeline: {}", args.bam);
@@ -153,15 +162,22 @@ fn evaluate_and_accumulate_pair(
     };
 
     // Evaluate alignment
-    let target_pool: &mut MetricPayload = if let Some(mapped_classification) = reference_map.get(mapped_target_name) {
+    let is_negative_control = expected_truth_value.eq_ignore_ascii_case("negative");
+
+    let target_pool = if is_negative_control {
+        // It's a negative control that managed to align -> FP (Control)
+        &mut report_data.negatives_control
+    } else if let Some(mapped_classification) = reference_map.get(mapped_target_name) {
         if mapped_classification == expected_truth_value {
+            // Correct target mapping -> TP
             &mut report_data.positives
         } else {
-            &mut report_data.negatives
+            // Wrong target mapping -> FP (Cross-Contamination)
+            &mut report_data.negatives_cross
         }
     } else {
-        // If the BAM target isn't in reference map, it's an automatic False Positive
-        &mut report_data.negatives 
+        // Mapped to a reference not in our map at all -> FP (Cross-Contamination)
+        &mut report_data.negatives_cross 
     };
 
     // Append alignment data profiles into vectors

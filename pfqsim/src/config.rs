@@ -212,7 +212,7 @@ impl Manifest {
 pub(crate) struct AnalyzeRow {
     pub(crate) id: String,      // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
     pub(crate) keyword: String, // Keyword used in generating reads @id:keyword:accession:read_number
-    pub(crate) reads: usize,    // The calculated read allocation from compose step
+    pub(crate) calculated_reads: usize,    // The calculated read allocation from compose step
 }
 
 pub(crate) struct AnalyzeConfig {

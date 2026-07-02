@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::io;
 use serde::{Serialize, Deserialize};
 
-
 // ============================================================================
 // Report data
 // ============================================================================
@@ -16,11 +15,13 @@ use serde::{Serialize, Deserialize};
 pub(crate) struct AnalyzeReportData {
     pub(crate) report_name: String,
     pub(crate) total_expected_pairs: usize,
+    pub(crate) total_expected_negative_pairs: usize,
     pub(crate) total_observed_pairs: usize,
     
     // Arrays of score points extracted from alignment pairs
     pub(crate) positives: MetricPayload,
-    pub(crate) negatives: MetricPayload,
+    pub(crate) negatives_control: MetricPayload, // For negative controls that map
+    pub(crate) negatives_cross: MetricPayload,
 }
 
 /// Pre-sorted vectors of stats for binary thresholding
@@ -57,7 +58,8 @@ pub(crate) fn generate_evaluation_report(
     
     // Sort elements for client-side binary search logic
     data.positives.sort_all();
-    data.negatives.sort_all();
+    data.negatives_control.sort_all();
+    data.negatives_cross.sort_all();
 
     let json_raw: String = serde_json::to_string(data).map_err(|e| {
         io::Error::new(io::ErrorKind::InvalidData, format!("JSON serialization error: {}", e))
@@ -105,6 +107,7 @@ pub(crate) fn generate_evaluation_report(
         .cell-tp {{ background: #dcfce7; font-weight: bold; color: #166534; }}
         .cell-fp {{ background: #fee2e2; font-weight: bold; color: #991b1b; }}
         .cell-fn {{ background: #fef9c3; font-weight: bold; color: #854d0e; }}
+        .cell-tn {{ background: #f3f4f6; font-weight: bold; color: #374151; }}
 
         /* Summary Stats List */
         .stat-list {{ list-style: none; padding: 0; margin: 0; font-size: 13px; }}
@@ -128,12 +131,12 @@ pub(crate) fn generate_evaluation_report(
                 <div class="control-group">
                     <label for="metric_selector">Target Diagnostic Feature</label>
                     <select id="metric_selector">
-                        <option value="mapq">Mapping Quality (MAPQ)</option>
                         <option value="align_score">Alignment Score (AS)</option>
                         <option value="align_length">Alignment Length (AL)</option>
                         <option value="as_al">AS / AL (Score per Base)</option>
                         <option value="align_proportion">Alignment Proportion (AL/RL)</option>
                         <option value="align_accuracy">Percent Identity (PI)</option>
+                        <option value="mapq">Mapping Quality (MAPQ)</option>
                     </select>
                 </div>
 
@@ -161,36 +164,48 @@ pub(crate) fn generate_evaluation_report(
                 <table class="matrix-table">
                     <tr>
                         <th colspan="2" rowspan="2"></th>
-                        <th colspan="2">True Ground Truth Condition</th>
+                        <th colspan="2">Actual Condition (Ground Truth)</th>
                     </tr>
                     <tr>
-                        <th>Positive (Aligned)</th>
-                        <th>Negative (Cross-Contam / Misplaced)</th>
+                        <th>Positive (Target)</th>
+                        <th>Negative (Control/Noise)</th>
                     </tr>
                     <tr>
-                        <th rowspan="2" style="writing-mode: vertical-lr; transform: rotate(180deg); font-size:11px;">Decision Outcome</th>
-                        <td class="matrix-label">Pass Filter (&ge;)</td>
-                        <td id="cell_tp" class="cell-tp">-</td>
-                        <td id="cell_fp" class="cell-fp">-</td>
+                        <th rowspan="2" style="writing-mode: vertical-lr; transform: rotate(180deg); font-size:11px;">Predicted Condition (Aligner Decision)</th>
+                        <td class="matrix-label">Positive (&ge; Threshold)</td>
+                        <td class="cell-tp">
+                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">True Positive (TP)</div>
+                            <div id="cell_tp" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-fp">
+                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">False Positive (FP)</div>
+                            <div id="cell_fp" style="font-size:16px;">-</div>
+                        </td>
                     </tr>
                     <tr>
-                        <td class="matrix-label">Fail Filter (&lt;)</td>
-                        <td id="cell_fn" class="cell-fn">-</td>
-                        <td style="color:#64748b; font-style:italic; background:#f8fafc;">Excluded</td>
+                        <td class="matrix-label">Negative (&lt; Threshold)</td>
+                        <td class="cell-fn">
+                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">False Negative (FN)</div>
+                            <div id="cell_fn" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-tn">
+                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">True Negative (TN)</div>
+                            <div id="cell_tn" style="font-size:16px;">-</div>
+                        </td>
                     </tr>
                 </table>
                 <p style="font-size:11px; color:#64748b; line-height:1.4; margin-top:15px;">
-                    * <strong>False Negatives (FN)</strong> represents simulated read allocations that were either rejected by the filter or dropped entirely from the BAM sequence pipeline during upstream alignment.
+                    * <strong>False Negatives (FN)</strong> represent simulated expected alignments that were rejected by the threshold filter or dropped entirely as unmapped.
                 </p>
             </div>
 
             <div class="panel">
                 <div class="panel-title">Simulation Summary Profile</div>
                 <ul class="stat-list">
-                    <li><span class="stat-label">Expected Simulated Pairs</span><span class="stat-value">{expected}</span></li>
+                    <li><span class="stat-label">Expected Target Pairs</span><span class="stat-value">{expected}</span></li>
                     <li><span class="stat-label">Observed Primary Pairs</span><span class="stat-value">{observed}</span></li>
-                    <li><span class="stat-label">Total TP Alignments (Bases)</span><span class="stat-value">{tp_count}</span></li>
-                    <li><span class="stat-label">Total FP Alignments (Bases)</span><span class="stat-value">{fp_count}</span></li>
+                    <li><span class="stat-label">Total Valid Placements</span><span class="stat-value">{tp_count}</span></li>
+                    <li><span class="stat-label">Total Error Placements</span><span class="stat-value">{fp_count}</span></li>
                 </ul>
             </div>
         </div>
@@ -204,8 +219,8 @@ pub(crate) fn generate_evaluation_report(
     <script>
         const payload = {json_raw};
 
-        // Binary Search lookup helper: counts values >= threshold inside a sorted array
-        fn countGreaterOrEqual(arr, threshold) {{
+        // Binary Search lookup helper
+        function countGreaterOrEqual(arr, threshold) {{
             let low = 0;
             let high = arr.length;
             while (low < high) {{
@@ -219,69 +234,95 @@ pub(crate) fn generate_evaluation_report(
             return arr.length - low;
         }}
 
+        // Approximates the Area Under Curve (AUC) using the trapezoidal rule
+        function calculateAUC(x_arr, y_arr) {{
+            let area = 0;
+            for (let i = 1; i < x_arr.length; i++) {{
+                let dx = Math.abs(x_arr[i] - x_arr[i - 1]);
+                let dy = (y_arr[i] + y_arr[i - 1]) / 2.0;
+                area += dx * dy;
+            }}
+            return area;
+        }}
+
+        // Dynamic Configuration builder based on pre-sorted array bounds
+        function getDynamicConfig(key) {{
+            const pos = payload.positives[key];
+            const neg_ctrl = payload.negatives_control[key];
+            const neg_cross = payload.negatives_cross[key];
+            
+            let min_val = Math.min(
+                pos.length > 0 ? pos[0] : Infinity,
+                neg_ctrl.length > 0 ? neg_ctrl[0] : Infinity,
+                neg_cross.length > 0 ? neg_cross[0] : Infinity
+            );
+            
+            let max_val = Math.max(
+                pos.length > 0 ? pos[pos.length - 1] : -Infinity,
+                neg_ctrl.length > 0 ? neg_ctrl[neg_ctrl.length - 1] : -Infinity,
+                neg_cross.length > 0 ? neg_cross[neg_cross.length - 1] : -Infinity
+            );
+
+            if (min_val === Infinity) min_val = 0;
+            if (max_val === -Infinity) max_val = 100;
+            
+            let step = (key === 'as_al' || key === 'align_proportion') ? 0.01 : 1;
+            
+            if (key === 'mapq') {{ min_val = 0; max_val = Math.max(max_val, 60); }}
+            if (key === 'align_accuracy') {{ min_val = 0; max_val = Math.max(max_val, 100); }}
+            
+            if (min_val === max_val) {{ max_val += step; }}
+            
+            return {{ min: min_val, max: max_val, step: step }};
+        }}
+
         const metricSelector = document.getElementById('metric_selector');
         const thresholdSlider = document.getElementById('threshold_slider');
 
-        // Dynamic Configuration Rules matching the alignment characteristics
-        const metricConfig = {{
-            mapq: {{ min: 0, max: 60, step: 1 }},
-            align_score: {{ min: 0, max: 300, step: 1 }},
-            align_length: {{ min: 0, max: 250, step: 1 }},
-            as_al: {{ min: 0, max: 2.0, step: 0.01 }},
-            align_proportion: {{ min: 0, max: 1.0, step: 0.01 }},
-            align_accuracy: {{ min: 0, max: 100, step: 1 }}
-        }};
-
-        // Initialize curves data arrays
-        let rocTraceIdx = null;
-        let prTraceIdx = null;
-
-        fn updateMetricLayout() {{
+        function updateMetricLayout() {{
             const key = metricSelector.value;
-            const config = metricConfig[key];
+            const config = getDynamicConfig(key);
 
             thresholdSlider.min = config.min;
             thresholdSlider.max = config.max;
             thresholdSlider.step = config.step;
             thresholdSlider.value = config.min;
 
-            document.getElementById('slider_min').innerText = config.min;
-            document.getElementById('slider_max').innerText = config.max;
+            document.getElementById('slider_min').innerText = config.min.toFixed(config.step % 1 === 0 ? 0 : 2);
+            document.getElementById('slider_max').innerText = config.max.toFixed(config.step % 1 === 0 ? 0 : 2);
 
-            generateStaticPlots(key);
+            generateStaticPlots(key, config);
             recalculateMetrics();
         }}
 
-        fn generateStaticPlots(key) {{
-            const config = metricConfig[key];
+        function generateStaticPlots(key, config) {{
             const steps = 100;
-            
             let roc_x = [], roc_y = [];
             let pr_x = [], pr_y = [];
 
-            // Compute ROC and PR curve space step coordinates
+            let total_sim_positives = payload.total_expected_pairs * 2; 
+            let total_sim_negatives = payload.total_expected_negative_pairs * 2;
+            let total_negatives_pool = total_sim_negatives + payload.negatives_cross[key].length;
+
             for(let i = 0; i <= steps; i++) {{
                 let t = config.min + ((config.max - config.min) * (i / steps));
-                
                 let tp = countGreaterOrEqual(payload.positives[key], t);
-                let fp = countGreaterOrEqual(payload.negatives[key], t);
-                
-                // Ground truths
-                let total_simulated_positives = payload.total_expected_simulated * 2; // R1 + R2
-                let total_negatives = payload.negatives[key].length;
-
-                let fn = total_simulated_positives - tp;
-
-                let tpr = total_simulated_positives > 0 ? (tp / total_simulated_positives) : 0;
-                let fpr = total_negatives > 0 ? (fp / total_negatives) : 0;
+                let fp_control = countGreaterOrEqual(payload.negatives_control[key], t);
+                let fp_cross = countGreaterOrEqual(payload.negatives_cross[key], t);
+                let fp = fp_control + fp_cross;
+                let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
+                let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
                 let precision = (tp + fp) > 0 ? (tp / (tp + fp)) : 1.0;
 
                 roc_x.push(fpr);
                 roc_y.push(tpr);
                 
-                pr_x.push(tpr); // Recall on X axis for PR curve
+                pr_x.push(tpr); 
                 pr_y.push(precision);
             }}
+
+            const roc_auc = calculateAUC(roc_x, roc_y);
+            const pr_auc = calculateAUC(pr_x, pr_y);
 
             const rocTrace = {{ x: roc_x, y: roc_y, type: 'scatter', mode: 'lines', name: 'ROC Curve', line: {{ color: '#2563eb', width: 2.5 }} }};
             const rocBaseline = {{ x: [0, 1], y: [0, 1], type: 'scatter', mode: 'lines', name: 'Random Guess', line: {{ color: '#94a3b8', dash: 'dash' }} }};
@@ -291,55 +332,57 @@ pub(crate) fn generate_evaluation_report(
             const prCurrent = {{ x: [0], y: [0], type: 'scatter', mode: 'markers', name: 'Current Cutoff', marker: {{ color: 'red', size: 10, symbol: 'cross' }} }};
 
             Plotly.newPlot('roc_plot', [rocTrace, rocBaseline, rocCurrent], {{
-                title: 'Receiver Operating Characteristic (ROC)',
+                title: 'Receiver Operating Characteristic (ROC)<br><span style="font-size:14px;color:#64748b;">AUC: ' + roc_auc.toFixed(4) + '</span>',
                 xaxis: {{ title: 'False Positive Rate (FPR)', range: [-0.02, 1.02] }},
                 yaxis: {{ title: 'True Positive Rate (TPR)', range: [-0.02, 1.02] }},
-                margin: {{ t:50, b:50, l:50, r:20 }},
+                margin: {{ t:60, b:50, l:50, r:20 }},
                 showlegend: false
             }}, {{ displaylogo: false }});
 
             Plotly.newPlot('pr_plot', [prTrace, prCurrent], {{
-                title: 'Precision-Recall Curve (PR)',
+                title: 'Precision-Recall Curve (PR)<br><span style="font-size:14px;color:#64748b;">AUC: ' + pr_auc.toFixed(4) + '</span>',
                 xaxis: {{ title: 'Recall (TPR)', range: [-0.02, 1.02] }},
                 yaxis: {{ title: 'Precision (PPV)', range: [-0.02, 1.02] }},
-                margin: {{ t:50, b:50, l:50, r:20 }},
+                margin: {{ t:60, b:50, l:50, r:20 }},
                 showlegend: false
             }}, {{ displaylogo: false }});
         }}
 
-        fn recalculateMetrics() {{
+        function recalculateMetrics() {{
             const key = metricSelector.value;
+            const config = getDynamicConfig(key);
             const threshold = parseFloat(thresholdSlider.value);
 
-            document.getElementById('current_threshold_view').innerText = threshold.toFixed(metricConfig[key].step % 1 === 0 ? 0 : 2);
+            document.getElementById('current_threshold_view').innerText = threshold.toFixed(config.step % 1 === 0 ? 0 : 2);
 
-            // Compute active counts using fast binary searches
             let tp = countGreaterOrEqual(payload.positives[key], threshold);
-            let fp = countGreaterOrEqual(payload.negatives[key], threshold);
+            let fp_control = countGreaterOrEqual(payload.negatives_control[key], threshold);
+            let fp_cross = countGreaterOrEqual(payload.negatives_cross[key], threshold);
             
-            // Expected ground truth positives totals across both channels
-            let total_sim_positives = payload.total_expected_simulated * 2;
-            let total_negatives = payload.negatives[key].length;
+            let fp = fp_control + fp_cross;
+            
+            let total_sim_positives = payload.total_expected_pairs * 2;
+            let total_sim_negatives = payload.total_expected_negative_pairs * 2;
+            let total_negatives_pool = total_sim_negatives + payload.negatives_cross[key].length;
 
             let fn = total_sim_positives - tp;
+            let tn = total_sim_negatives - fp_control;
 
-            // Equation evaluations
             let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
-            let fpr = total_negatives > 0 ? (fp / total_negatives) : 0;
+            let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
             let precision = (tp + fp) > 0 ? (tp / (tp + fp)) : 1.0;
             let f1 = (precision + tpr) > 0 ? (2 * (precision * tpr) / (precision + tpr)) : 0;
 
-            // Update DOM text labels
             document.getElementById('cell_tp').innerText = tp.toLocaleString();
             document.getElementById('cell_fp').innerText = fp.toLocaleString();
             document.getElementById('cell_fn').innerText = fn.toLocaleString();
+            document.getElementById('cell_tn').innerText = tn.toLocaleString();
 
             document.getElementById('stat_precision').innerText = (precision * 100).toFixed(2) + '%';
             document.getElementById('stat_recall').innerText = (tpr * 100).toFixed(2) + '%';
             document.getElementById('stat_fpr').innerText = (fpr * 100).toFixed(2) + '%';
             document.getElementById('stat_f1').innerText = f1.toFixed(4);
 
-            // Update marker icons on Plotly traces
             Plotly.animate('roc_plot', {{
                 data: [{{}}, {{}}, {{ x: [fpr], y: [tpr] }}],
                 traces: [0, 1, 2]
@@ -363,8 +406,8 @@ pub(crate) fn generate_evaluation_report(
     name = data.report_name,
     expected = data.total_expected_pairs,
     observed = data.total_observed_pairs,
-    tp_count = data.positives.mapq.len(),
-    fp_count = data.negatives.mapq.len(),
+    tp_count = data.positives.align_score.len(),
+    fp_count = data.negatives_control.align_score.len() + data.negatives_cross.align_score.len(),
     json_raw = json_raw
     );
 
