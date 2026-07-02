@@ -321,6 +321,25 @@ pub(crate) fn generate_evaluation_report(
                 pr_y.push(precision);
             }}
 
+            // Enforce ROC anchors
+            // If the lowest threshold didn't reach 100% FPR/TPR, anchor the start to (1, 1)
+            if (roc_x[0] < 1.0 || roc_y[0] < 1.0) {{
+                roc_x.unshift(1.0);
+                roc_y.unshift(1.0);
+            }}
+            // If the highest threshold didn't reach 0% FPR/TPR, anchor the end to (0, 0)
+            if (roc_x[roc_x.length - 1] > 0.0 || roc_y[roc_y.length - 1] > 0.0) {{
+                roc_x.push(0.0);
+                roc_y.push(0.0);
+            }}
+
+            // Enforce PR anchor
+            // If the highest threshold didn't force recall (TPR) all the way to 0, anchor end to (0, 1)
+            if (pr_x[pr_x.length - 1] > 0.0) {{
+                pr_x.push(0.0);
+                pr_y.push(1.0); // Convention dictates precision is 1.0 at 0 recall
+            }}
+
             const roc_auc = calculateAUC(roc_x, roc_y);
             const pr_auc = calculateAUC(pr_x, pr_y);
 
