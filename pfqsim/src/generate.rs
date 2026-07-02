@@ -33,13 +33,11 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let deletion_buffer: usize = 20;
     
     // 1. Initialize the FastaReader and load the weighted ReferenceGenome
-    let ref_reader: FastaReader<ReaderType> = FastaReader::open(args.fasta.to_str().unwrap())?;
+    let ref_reader: FastaReader<ReaderType> = FastaReader::open(&args.fasta)?;
     let reference: ReferenceGenome = ReferenceGenome::load(ref_reader, 1000, args.circular)?;
     
     // 2. Load model, initialize mutator and samplers
-    let model_path: &str = args.model.to_str().ok_or_else(|| {
-        Error::new(ErrorKind::InvalidInput, "Model path is not valid UTF-8")
-    })?;
+    let model_path: &str = &args.model;
     let model: LibraryModel = LibraryModel::from_file(model_path)
         .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
     let inserts: InsertSize = InsertSize::new(&model.insert_size)
@@ -136,12 +134,12 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
             // F. Format headers
-            let r1_base_id: String = format!("{}:{}:{} 1:N:{}:{}:{}",
-                args.prefix, accession, global_read_id, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, 
+            let r1_base_id: String = format!("{}:{}:{}:{} 1:N:{}:{}:{}",
+                args.prefix, args.keyword, accession, global_read_id, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, 
             );
 
-            let r2_base_id: String = format!("{}:{}:{} 2:N:{}:{}:{}",
-                args.prefix, accession, global_read_id, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, 
+            let r2_base_id: String = format!("{}:{}:{}:{} 2:N:{}:{}:{}",
+                args.prefix, args.keyword, accession, global_read_id, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, 
             );
 
             // G. Generate qualities

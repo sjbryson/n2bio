@@ -2,23 +2,33 @@
 //! 
 
 use std::io;
+use std::fs::File;
 use std::path::{ Path, PathBuf };
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
 
 use crate::config::AnalyzeConfig;
-use crate::cli::AnalyzeArgs;
+use crate::cli::{ AnalyzeArgs, MappingMode };
 use crate::report::{ AnalyzeReportData, MetricPayload, generate_evaluation_report };
 
     
 pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
     // Read config
-    println!("Loading benchmark baseline configuration: {}", args.manifest);
-    let config: AnalyzeConfig = AnalyzeConfig::from_tsv(&args.manifest)?;
+    println!("Loading benchmark baseline configuration: {}", args.config);
+    let config: AnalyzeConfig = AnalyzeConfig::from_tsv(&args.config)?;
 
-    // Total simulated inputs to calibrate baseline False Negatives
-    let total_expected: usize = config.rows.iter().map(|row| row.reads).sum();
+    println!("Loading reference mapping classifications: {}", args.reference_map);
+    let reference_map: HashMap<String, String> = load_reference_map(args.reference_map)?;
+
+    // Total simulated inputs to calibrate baseline False Negatives.
+    // Negative control reads are safely excluded from this pool.
+    let total_expected: usize = config.rows
+        .iter()
+        .filter(|row| !row.keyword.eq_ignore_ascii_case("negative"))
+        .map(|row| row.reads)
+        .sum();
 
     let mut report_data: AnalyzeReportData = AnalyzeReportData {
         report_name: args.output.clone(),
@@ -28,8 +38,8 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         negatives: MetricPayload::default(),
     };
 
-    println!("Processing name-sorted BAM tracking pipeline: {}", args.bam.display());
-    let mut bam_reader: BamReader = BamReader::open(args.bam.to_str().unwrap())?;
+    println!("Processing name-sorted BAM tracking pipeline: {}", args.bam);
+    let mut bam_reader: BamReader = BamReader::open(&args.bam)?;
     let header: BamHeader = bam_reader.read_header()?;
 
     let mut current_record: BamRecord = BamRecord::default();
@@ -42,7 +52,7 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
             if !prev_qname.is_empty() {
                 if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
                     report_data.total_observed_pairs += 1;
-                    evaluate_and_accumulate_pair(&r1, &r2, &header, &mut report_data);
+                    evaluate_and_accumulate_pair(&r1, &r2, &header, &reference_map, &args.mapping_mode, &mut report_data);
                 }
             }
             r1_record = None;
@@ -63,7 +73,7 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
     if !prev_qname.is_empty() {
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
             report_data.total_observed_pairs += 1;
-            evaluate_and_accumulate_pair(&r1, &r2, &header, &mut report_data);
+            evaluate_and_accumulate_pair(&r1, &r2, &header, &reference_map, &args.mapping_mode, &mut report_data);
         }
     }
 
@@ -73,11 +83,29 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         out_html_path.set_extension("html");
     }
 
-    println!("Processing metric data vectors and writing HTML Report dashboard...");
+    println!("Processing metric data vectors and writing HTML report ...");
     generate_evaluation_report(&mut report_data, &out_html_path)?;
     
     println!("Evaluation completed successfully. Report dashboard ready at: {}", out_html_path.display());
     Ok(())
+}
+
+/// Loads a 2-column TSV mapping BAM reference targets to their classification group.
+fn load_reference_map(path: String) -> io::Result<HashMap<String, String>> {
+    let file: File = File::open(PathBuf::from(path))?;
+    let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false) // Assuming no headers, otherwise change to true
+        .from_reader(file);
+
+    let mut map: HashMap<String, String> = HashMap::new();
+    for result in rdr.records() {
+        let record: csv::StringRecord = result.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        if record.len() >= 2 {
+            map.insert(record[0].to_string(), record[1].to_string());
+        }
+    }
+    Ok(map)
 }
 
 /// Determines if a pair matches the ground-truth assignment and moves scores into the appropriate target vectors
@@ -85,6 +113,8 @@ fn evaluate_and_accumulate_pair(
     r1: &BamRecord,
     r2: &BamRecord,
     header: &BamHeader,
+    reference_map: &HashMap<String, String>,
+    mapping_mode: &MappingMode,
     report_data: &mut AnalyzeReportData,
 ) {
     // Get read name (query)
@@ -94,28 +124,44 @@ fn evaluate_and_accumulate_pair(
     }
     let qname_str: Cow<'_, str> = String::from_utf8_lossy(name_bytes);
 
-    // Parse the read name - "@id:accession:read_number"
+    // Parse the read name - "@id:keyword:accession:read_number"
     let mut tokens: std::str::Split<'_, char> = qname_str.split(':');
-    let _source_id: &str = match tokens.next() {
-        Some(id) => id,
-        None => return, // Malformed name string, skip
+    let source_id: &str = match tokens.next() {
+        Some(val) => val,
+        None => return, 
+    };
+    let keyword: &str = match tokens.next() {
+        Some(val) => val,
+        None => return, 
     };
     let true_accession: &str = match tokens.next() {
-        Some(acc) => acc,
-        None => return, // Malformed name string, skip
+        Some(val) => val,
+        None => return, 
     };
 
     // Get the alignment target name
     if r1.ref_id < 0 || (r1.ref_id as usize) >= header.references.len() {
-        return; 
+        return; // Unmapped read counts towards False Negatives
     }
-    let mapped_target_accession: &String = &header.references[r1.ref_id as usize].name;
+    let mapped_target_name: &String = &header.references[r1.ref_id as usize].name;
+
+    // Determine the expected ground-truth value based on CLI mapping mode
+    let expected_truth_value: &str = match mapping_mode {
+        MappingMode::ReadId => source_id,
+        MappingMode::ReadKeyword => keyword,
+        MappingMode::ReadAccession => true_accession,
+    };
 
     // Evaluate alignment
-    let target_pool: &mut MetricPayload = if true_accession == mapped_target_accession {
-        &mut report_data.positives
+    let target_pool: &mut MetricPayload = if let Some(mapped_classification) = reference_map.get(mapped_target_name) {
+        if mapped_classification == expected_truth_value {
+            &mut report_data.positives
+        } else {
+            &mut report_data.negatives
+        }
     } else {
-        &mut report_data.negatives
+        // If the BAM target isn't in reference map, it's an automatic False Positive
+        &mut report_data.negatives 
     };
 
     // Append alignment data profiles into vectors

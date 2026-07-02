@@ -3,7 +3,6 @@
 
 use std::io;
 use std::fs;
-use std::path::PathBuf;
 use crate::cli::{ComposeArgs, GenerateArgs};
 use crate::config::{Config, Manifest};
 use crate::generate;
@@ -40,8 +39,9 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
         // Map configuration settings into the generate command
         let gen_args: GenerateArgs = GenerateArgs {
             prefix: row.id.clone(), 
-            fasta: PathBuf::from(row.fasta.clone()),
-            model: PathBuf::from(row.model.clone()),
+            keyword: row.keyword.clone(),
+            fasta: row.fasta.clone(),
+            model: row.model.clone(),
             num_reads: row.calculated_reads,
             read_length: row.read_length,
             sub_rate: row.sub_rate,

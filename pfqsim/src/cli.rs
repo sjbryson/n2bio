@@ -1,8 +1,7 @@
 //! n2bio/pfqsim/src/cli.rs
 //! 
 
-use clap::{ Args, Parser, Subcommand, ArgGroup };
-use std::path::PathBuf;
+use clap::{ Args, Parser, Subcommand };
 
 #[derive(Parser)]
 #[command(name = "pfqsim", version = "1.0", about = "Fast metagenomic read simulator")]
@@ -26,13 +25,13 @@ pub(crate) enum Commands {
 #[derive(Args)]
 pub(crate) struct ModelArgs {
     
-    /// Name for the BAM file for modeling insert size and Qscore distributions
+    /// Path to the BAM file for modeling insert size and Qscore distributions
     #[arg(short = 'b', long)]
-    pub bam: PathBuf,
+    pub bam: String,
 
     /// Name for the JSON model report -> creates {model}.json
     #[arg(short = 'm', long)]
-    pub model: PathBuf,
+    pub model: String,
 
     /// Read length to model (default = 150)
     #[arg(short = 'l', long, default_value_t = 150)]
@@ -50,38 +49,43 @@ pub(crate) struct ModelArgs {
 #[derive(Args)]
 pub(crate) struct GenerateArgs {
     
-    /// Path to the JSON model report -> created by pfqsim --model
+    /// Path to the JSON model report -> created by pfqsim model
     #[arg(short = 'm', long)]
-    pub model: PathBuf,
+    pub model: String,
 
-    /// Path to the fasta file to generate reads from
+    /// Path to the genome fasta file to generate reads from
     #[arg(short = 'f', long)]
-    pub fasta: PathBuf,
+    pub fasta: String,
 
-    /// Boolean value: circular genome
+    /// Boolean value: circularize genome before generating reads
     #[arg(short = 'c', long, default_value_t = false)]
     pub circular: bool,
 
-    /// Float value for random substitution rate to apply to simulated reads
-    #[arg(short = 's', long)]
+    /// Float value for random substitution rate to apply to simulated reads (range: 0.0 - 1.0)
+    #[arg(short = 's', long, default_value_t = 0.0)]
     pub sub_rate: f64,
 
-    /// Float value for random insertion and deletion rate to apply to simulated reads
-    #[arg(short = 'i', long)]
+    /// Float value for random insertion and deletion rate to apply to simulated reads (range: 0.0 - 1.0)
+    #[arg(short = 'i', long, default_value_t = 0.0)]
     pub indel_rate: f64,
 
     /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
     #[arg(short = 'n', long)]
     pub num_reads: usize,
 
-    /// Read length to model (default = 150)
+    /// Read length to generate (default = 150)
     #[arg(short = 'l', long, default_value_t = 150)]
     pub read_length: usize,
 
     /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
-    /// and for read identifiers (e.g. @{prefix}:Accession::Read Num)
+    /// and for read identifiers (e.g. @{prefix}:{keyword}:Accession::Read Num)
     #[arg(short = 'p', long)]
     pub prefix: String,
+
+    /// Additional keyword to add to read identifiers
+    /// for use in query-target mapping (e.g. @{prefix}:{keyword}:Accession::Read Num)
+    #[arg(short = 'k', long)]
+    pub keyword: String,
 
     /// Number of worker threads
     #[arg(short = 't', long)]
@@ -96,7 +100,7 @@ pub(crate) struct GenerateArgs {
 }
 
 
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq)]
+#[derive(clap::ValueEnum, Clone, Debug)]
 pub(crate) enum AbundanceMode {
     /// Calculate abundance as fraction of total reads
     #[value(name = "reads")]
@@ -112,7 +116,7 @@ pub(crate) struct ComposeArgs {
     
     /// Path to a TSV config file 
     #[arg(short = 'c', long)]
-    pub config: PathBuf,
+    pub config: String,
 
     /// Prefix for the manifest tsv and both simulated reads (R1 & R2) files 
     #[arg(short = 'p', long)]
@@ -132,18 +136,42 @@ pub(crate) struct ComposeArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
-#[command(group(ArgGroup::new("input").required(true).args(["bam", "sam"]),))]
 pub(crate) struct AnalyzeArgs {
     
-    /// Path to the manifest.tsv generated during the compose step
-    #[arg(short = 'm', long)]
-    pub manifest: String,
+    /// Path to a TSV config file 
+    #[arg(short = 'c', long)]
+    pub config: String,
 
     /// Path to an input BAM file to evaluate
     #[arg(short = 'b', long)]
-    pub bam: PathBuf,
+    pub bam: String,
+
+    /// Path to a TSV mapping file: reference id --> mapping-mode(id, keyword, or accession)
+    #[arg(short = 'r', long = "reference-map")]
+    pub reference_map: String,
 
     /// Output path prefix for the generated HTML evaluation report
     #[arg(short = 'o', long, default_value = "pfqsim_report")]
     pub output: String,
+
+    /// Part of read identifier to use for reference sequence mapping
+    #[arg(short = 'm', long = "mapping-mode")]
+    pub mapping_mode: MappingMode,
+}
+
+/// Which part of the read identifier to map to database accessions for analysis
+/// @{ReadId}:{ReadKeyword}:{ReadAccession}:ReadNumber
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub(crate) enum MappingMode {
+    /// Reference database mapping: Accession --> ReadId
+    #[value(name = "id")]
+    ReadId,
+    
+    /// Reference database mapping: Accession --> ReadKeyword
+    #[value(name = "keyword")]
+    ReadKeyword,
+
+    /// Reference database mapping: Accession --> ReadAccession
+    #[value(name = "accession")]
+    ReadAccession,
 }

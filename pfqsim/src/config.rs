@@ -19,6 +19,7 @@ use crate::genome::ReferenceGenome;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct ConfigRow {
     pub(crate) id: String,
+    pub(crate) keyword: String,
     pub(crate) abundance: f64,
     pub(crate) fasta: String,
     pub(crate) model: String,
@@ -111,6 +112,7 @@ impl Config {
 pub(crate) struct ManifestRow {
     // Fields preserved from the configuration
     pub(crate) id: String,
+    pub(crate) keyword: String,
     pub(crate) abundance: f64,
     pub(crate) fasta: String,
     pub(crate) genome_length: usize,
@@ -128,6 +130,7 @@ impl ManifestRow {
     pub(crate) fn from_config_row(row: ConfigRow, calculated_reads: usize) -> Self {
         Self {
             id: row.id,
+            keyword: row.keyword,
             abundance: row.abundance,
             fasta: row.fasta,
             genome_length: row.genome_length,
@@ -207,8 +210,9 @@ impl Manifest {
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct AnalyzeRow {
-    pub(crate) id: String,     // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
-    pub(crate) reads: usize,   // The calculated read allocation from compose step
+    pub(crate) id: String,      // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
+    pub(crate) keyword: String, // Keyword used in generating reads @id:keyword:accession:read_number
+    pub(crate) reads: usize,    // The calculated read allocation from compose step
 }
 
 pub(crate) struct AnalyzeConfig {

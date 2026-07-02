@@ -18,7 +18,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     let read_length: usize               = args.read_length;
     let mut total_pairs: usize           = 0;
     let max_insert_size: i32             = args.max_ins as i32;
-    let mut bam_reader: BamReader        = BamReader::open(args.bam.to_str().unwrap())?;
+    let mut bam_reader: BamReader        = BamReader::open(&args.bam)?;
     let _header: n2core::bam::BamHeader  = bam_reader.read_header()?;
     let mut current_record: BamRecord    = BamRecord::default();
     let mut r1_record: Option<BamRecord> = None;
@@ -86,9 +86,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     // Compile the final nested profile
     let final_model: LibraryModel = profiler.build(read_length);
     // Write model to file
-    let out_path: &str = args.model.to_str().ok_or_else(|| {
-        Error::new(ErrorKind::InvalidInput, "Output path is not valid UTF-8")
-    })?;
+    let out_path: &str = &args.model;
     
     final_model.to_file(out_path).map_err(|e| {
         Error::new(ErrorKind::Other, format!("Failed to save JSON model: {}", e))
