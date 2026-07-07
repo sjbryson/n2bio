@@ -12,20 +12,20 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
-    /// Build insert size and Q-score distributions from a BAM file
+    /// Build insert size, read length, and Q-score distributions from a name sorted BAM file
     Model(ModelArgs),
     /// Generate a simulated paired-read library from a reference FASTA
     Generate(GenerateArgs),
     /// Compose a final metagenomic library based on an abundance config
     Compose(ComposeArgs),
-    /// Analyze alignments from stdin sam or a bam file
+    /// Analyze alignments from a name sorted BAM file for classification stats
     Analyze(AnalyzeArgs),
 }
 
 #[derive(Args)]
 pub(crate) struct ModelArgs {
     
-    /// Path to the BAM file for modeling insert size and Qscore distributions
+    /// Path to the BAM file for modeling insert size, read length, and Qscore distributions
     #[arg(short = 'b', long)]
     pub bam: String,
 
@@ -33,7 +33,7 @@ pub(crate) struct ModelArgs {
     #[arg(short = 'm', long)]
     pub model: String,
 
-    /// Read length to model (default = 150)
+    /// Read length to model
     #[arg(short = 'l', long, default_value_t = 150)]
     pub read_length: usize,
 
@@ -73,9 +73,13 @@ pub(crate) struct GenerateArgs {
     #[arg(short = 'n', long)]
     pub num_reads: usize,
 
-    /// Read length to generate (default = 150)
+    /// Read length to generate
     #[arg(short = 'l', long, default_value_t = 150)]
     pub read_length: usize,
+
+    /// Boolean value: Vary read lengths based on model
+    #[arg(long, default_value_t = false)]
+    pub vary_lengths: bool,
 
     /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
     /// and for read identifiers (e.g. @{prefix}:{keyword}:Accession::Read Num)
@@ -118,6 +122,10 @@ pub(crate) struct ComposeArgs {
     #[arg(short = 'c', long)]
     pub config: String,
 
+    /// Path to the JSON model report -> created by pfqsim model
+    #[arg(short = 'm', long)]
+    pub model: String,
+
     /// Prefix for the manifest tsv and both simulated reads (R1 & R2) files 
     #[arg(short = 'p', long)]
     pub prefix: String,
@@ -125,6 +133,14 @@ pub(crate) struct ComposeArgs {
     /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
     #[arg(short = 'n', long)]
     pub total_reads: usize,
+
+    /// Read length to generate
+    #[arg(short = 'l', long, default_value_t = 150)]
+    pub read_length: usize,
+
+    /// Boolean value: Vary read lengths based on model
+    #[arg(long, default_value_t = false)]
+    pub vary_lengths: bool,
 
     /// Number of worker threads
     #[arg(short = 't', long)]
@@ -150,7 +166,7 @@ pub(crate) struct AnalyzeArgs {
     #[arg(short = 'r', long = "reference-map")]
     pub reference_map: String,
 
-    /// Output path prefix for the generated HTML evaluation report
+    /// Output path prefix for the generated HTML & json evaluation reports
     #[arg(short = 'o', long, default_value = "pfqsim_report")]
     pub output: String,
 

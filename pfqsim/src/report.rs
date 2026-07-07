@@ -6,59 +6,7 @@ use std::path::PathBuf;
 use std::io;
 use serde::{Serialize, Deserialize};
 
-// ============================================================================
-// Core Histogram Logic
-// ============================================================================
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum HistType {
-    Integer { min: f64, max: f64 },
-    Float { min: f64, max: f64, bin_width: f64 },
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct Histogram {
-    pub(crate) min_val: f64,
-    pub(crate) max_val: f64,
-    pub(crate) bin_width: f64,
-    pub(crate) counts: Vec<usize>,
-}
-
-impl Histogram {
-    pub(crate) fn new(hist_type: HistType) -> Self {
-        let (min_val, max_val, bin_width) = match hist_type {
-            HistType::Integer { min, max } => (min, max, 1.0),
-            HistType::Float { min, max, bin_width } => (min, max, bin_width),
-        };
-        let num_bins: usize = ((max_val - min_val) / bin_width).ceil() as usize + 1;
-        Self { min_val, max_val, bin_width, counts: vec![0; num_bins] }
-    }
-
-    pub(crate) fn increment(&mut self, value: f64) {
-        let clamped: f64 = value.clamp(self.min_val, self.max_val);
-        let bin_index: usize = ((clamped - self.min_val) / self.bin_width).round() as usize;
-        if let Some(bin) = self.counts.get_mut(bin_index) {
-            *bin += 1;
-        }
-    }
-    
-    pub(crate) fn total_count(&self) -> usize {
-        self.counts.iter().sum()
-    }
-
-    pub(crate) fn trim(&mut self) {
-        if let Some(last_active_index) = self.counts.iter().rposition(|&count| count > 0) {
-            // Truncate the vector to remove all trailing zeros
-            self.counts.truncate(last_active_index + 1);
-            // Adjust max_val to reflect the actual highest bin in the trimmed data
-            self.max_val = self.min_val + (last_active_index as f64 * self.bin_width);
-        } else {
-            // If the histogram is completely empty, collapse it to a single zero bin
-            self.counts.truncate(1);
-            self.max_val = self.min_val;
-        }
-    }
-}
+use crate::hist::{ HistType, Histogram };
 
 // ============================================================================
 // Report data
@@ -230,11 +178,11 @@ pub(crate) fn generate_evaluation_reports(
                 <ul class="stat-list">
                     <li><span class="stat-label">Precision (PPV)</span><span id="stat_precision" class="stat-value">-</span></li>
                     <li><span class="stat-label">Recall - TPR (Sensitivity)</span><span id="stat_recall" class="stat-value">-</span></li>
+                    <li><span class="stat-label">False Positive Rate (FPR)</span><span id="stat_fpr" class="stat-value">-</span></li>
                     <li><span class="stat-label">Specificity (TNR)</span><span id="stat_specificity" class="stat-value">-</span></li>
                     <li><span class="stat-label">Accuracy</span><span id="stat_accuracy" class="stat-value">-</span></li>
                     <li><span class="stat-label">Negative Pred Value (NPV)</span><span id="stat_npv" class="stat-value">-</span></li>
                     <li><span class="stat-label">Prevalence</span><span id="stat_prevalence" class="stat-value">-</span></li>
-                    <li><span class="stat-label">False Positive Rate (FPR)</span><span id="stat_fpr" class="stat-value">-</span></li>
                     <li><span class="stat-label">F1-Score</span><span id="stat_f1" class="stat-value">-</span></li>
                 </ul>
             </div>

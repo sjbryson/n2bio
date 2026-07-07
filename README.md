@@ -183,73 +183,122 @@ Options:
   -V, --version  Print version
 ```
 
-- **pfqsim model** - Build insert size and Q-score distributions from a name sorted BAM file. Make sure the bam was name sorted e.g. samtools sort -n -o name_sorted.bam -
+- **pfqsim model** - Build insert size, read length, and Q-score distributions from a name sorted BAM file. Make sure the bam was name sorted e.g. samtools sort -n -o name_sorted.bam -
 
 ```
-Usage: pfqsim model [OPTIONS] --bam <BAM> --output <OUTPUT>
+Usage: pfqsim model [OPTIONS] --bam <BAM> --model <MODEL>
 
 Options:
-  -b, --bam <BAM>        Name for the BAM file for modeling insert size and Qscore distributions
-  -o, --output <OUTPUT>  Name for the JSON model report -> creates {output}.json
-  -l, --length <LENGTH>  Read length to model [default: 150]
-  -q, --mapq <MAPQ>      Optional: Min MAPQ score for filtering alignments for insert size distribution [default: 40]
-  -h, --help             Print help
+  -b, --bam <BAM>                  Path to the BAM file for modeling insert size, read length, and Qscore distributions
+  -m, --model <MODEL>              Name for the JSON model report -> creates {model}.json
+  -l, --read-length <READ_LENGTH>  Read length to model [default: 150]
+  -q, --mapq <MAPQ>                Min MAPQ score for filtering alignments for insert size distribution [default: 40]
+  -i, --max-ins <MAX_INS>          Max insert size to use for insert size distribution [default: 1000]
+  -h, --help                       Print help
 ```
-- **pfqsim generate** - 
+- **pfqsim generate** - Generate a simulated paired-read library from a reference FASTA
 ```
-Generate a simulated paired-read library from a reference FASTA
-
-Usage: pfqsim generate [OPTIONS] --model <MODEL> --fasta <FASTA> --sub-rate <SUB_RATE> --indel-rate <INDEL_RATE> --num-reads <NUM_READS> --prefix <PREFIX> --threads <THREADS>
+Usage: pfqsim generate [OPTIONS] --model <MODEL> --fasta <FASTA> --num-reads <NUM_READS> --prefix <PREFIX> --keyword <KEYWORD> --threads <THREADS>
 
 Options:
-  -m, --model <MODEL>            Path to the JSON model report -> created by pfqsim --model
-  -f, --fasta <FASTA>            Path to the fasta file to generate reads from
-  -c, --circular                 Boolean value: circular genome
-  -s, --sub-rate <SUB_RATE>      Float value for random substitution rate to apply to simulated reads
-  -i, --indel-rate <INDEL_RATE>  Float value for random insertion and deletion rate to apply to simulated reads
-  -n, --num-reads <NUM_READS>    Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
-  -l, --length <LENGTH>          Read length to model (default = 150) [default: 150]
-  -p, --prefix <PREFIX>          Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz) and for read identifiers (e.g. @{prefix}:Accession:Read Num)
-  -t, --threads <THREADS>        Number of worker threads
-  -h, --help                     Print help
+  -m, --model <MODEL>              Path to the JSON model report -> created by pfqsim model
+  -f, --fasta <FASTA>              Path to the genome fasta file to generate reads from
+  -c, --circular                   Boolean value: circularize genome before generating reads
+  -s, --sub-rate <SUB_RATE>        Float value for random substitution rate to apply to simulated reads (range: 0.0 - 1.0) [default: 0]
+  -i, --indel-rate <INDEL_RATE>    Float value for random insertion and deletion rate to apply to simulated reads (range: 0.0 - 1.0) [default: 0]
+  -n, --num-reads <NUM_READS>      Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
+  -l, --read-length <READ_LENGTH>  Read length to generate [default: 150]
+      --vary-lengths               Boolean value: Vary read lengths based on model
+  -p, --prefix <PREFIX>            Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz) and for read identifiers (e.g. @{prefix}:{keyword}:Accession::Read Num)
+  -k, --keyword <KEYWORD>          Additional keyword to add to read identifiers for use in query-target mapping (e.g. @{prefix}:{keyword}:Accession::Read Num)
+  -t, --threads <THREADS>          Number of worker threads
+  -h, --help                       Print help
   ```
-- **pfqsim compose** - Use a config file to create a test library from a set of genome fastas. 
+- **pfqsim compose** - Compose a final metagenomic library based on an abundance config. 
 ```
-Usage: pfqsim compose [OPTIONS] --config <CONFIG> --prefix <PREFIX> --total-reads <TOTAL_READS> --threads <THREADS>
+Usage: pfqsim compose [OPTIONS] --config <CONFIG> --model <MODEL> --prefix <PREFIX> --total-reads <TOTAL_READS> --threads <THREADS>
 
 Options:
   -c, --config <CONFIG>
           Path to a TSV config file
+
+  -m, --model <MODEL>
+          Path to the JSON model report -> created by pfqsim model
+
   -p, --prefix <PREFIX>
           Prefix for the manifest tsv and both simulated reads (R1 & R2) files
+
   -n, --total-reads <TOTAL_READS>
           Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
+
+  -l, --read-length <READ_LENGTH>
+          Read length to generate
+          
+          [default: 150]
+
+      --vary-lengths
+          Boolean value: Vary read lengths based on model
+
   -t, --threads <THREADS>
           Number of worker threads
-      --abundance-mode <ABUNDANCE_MODE> [default: reads]
+
+      --abundance-mode <ABUNDANCE_MODE>
           How abundance values should be mathematically interpreted
+
           Possible values:
           - reads:  Calculate abundance as fraction of total reads
           - copies: Calculate abundance as fraction of total genome copies
+          
+          [default: reads]
+
   -h, --help
           Print help (see a summary with '-h')
 ```
 
 The configuration file requires the following fields:
 
-    - id: [String]  This will be incorporated into the sequence identifier for all reads generated from each row's genome. 
+    - id: [String]  This will be incorporated into the sequence identifier for all reads generated from each row's genome ("@{id}:...).
+    - keyword: [String]  This is incroporated as the second position in each sequence identifier (e.g. @{id}:{keyword}:...) 
     - abundance: [f64]  Relative abundance of total reads (range: 0-1) to generate for each row's genome. Used to calculate the number of reads to generate for each row - calculation based on proprtion of total reads (default abundance mode "reads") or proportion of genome copies (abundance mode "copies")
     - fasta: [Path] Path to the genome fasta for this row.
-    - model: [Path] Path to the model.json file (created with pfqsim model) to use for each genome.
     - circular: [bool]  Should the genome in this row be circularized before read generation. Only works with single contig genomes.
     - sub_rate: [f64] Substitution rate (range: 0-1) to apply to simulated reads.
     - indel_rate: [f64] Random insertion or deletion rate (range: 0-1) to apply to simulated reads.
-    - read_length: [int]  Length of simulated reads.
-
+    
 A validation step calculates all genome sizes for abundance calculations and forces circular=false for any multi contig genome fasta.
 <br>
 
-- **pfqsim analyze** - ToDo: Use config to calculate alignment stats, e.g. accuracy, sensitivity, ROC, etc.
+- **pfqsim analyze** - Analyze alignments from a name sorted BAM file for classification stats, e.g. accuracy, sensitivity, ROC, etc. Generates an html report with interactive threshholding and json report.
+
+```
+Usage: pfqsim analyze [OPTIONS] --config <CONFIG> --bam <BAM> --reference-map <REFERENCE_MAP> --mapping-mode <MAPPING_MODE>
+
+Options:
+  -c, --config <CONFIG>
+          Path to a TSV config file
+
+  -b, --bam <BAM>
+          Path to an input BAM file to evaluate
+
+  -r, --reference-map <REFERENCE_MAP>
+          Path to a TSV mapping file: reference id --> mapping-mode(id, keyword, or accession)
+
+  -o, --output <OUTPUT>
+          Output path prefix for the generated HTML & json evaluation reports
+          
+          [default: pfqsim_report]
+
+  -m, --mapping-mode <MAPPING_MODE>
+          Part of read identifier to use for reference sequence mapping
+
+          Possible values:
+          - id:        Reference database mapping: Accession --> ReadId
+          - keyword:   Reference database mapping: Accession --> ReadKeyword
+          - accession: Reference database mapping: Accession --> ReadAccession
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
 
   ---
 

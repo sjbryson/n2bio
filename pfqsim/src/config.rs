@@ -17,15 +17,13 @@ use crate::genome::ReferenceGenome;
 // ============================================================================
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct ConfigRow {
+pub(crate) struct ComposeTask {
     pub(crate) id: String,
     pub(crate) keyword: String,
     pub(crate) abundance: f64,
-    pub(crate) fasta: String,
-    pub(crate) model: String,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
-    pub(crate) read_length: usize,
+    pub(crate) fasta: String,
     
     #[serde(deserialize_with = "deserialize_flexible_bool")]
     pub(crate) circular: bool,
@@ -53,11 +51,11 @@ where
     }
 }
 
-pub(crate) struct Config {
-    pub(crate) rows: Vec<ConfigRow>,
+pub(crate) struct ComposeConfig {
+    pub(crate) rows: Vec<ComposeTask>,
 }
 
-impl Config {
+impl ComposeConfig {
     /// Parses a community TSV file into a Config instance
     pub(crate) fn from_tsv<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let file: File = File::open(path)?;
@@ -65,9 +63,9 @@ impl Config {
             .delimiter(b'\t')
             .from_reader(file);
 
-        let mut rows: Vec<ConfigRow> = Vec::new();
+        let mut rows: Vec<ComposeTask> = Vec::new();
         for result in rdr.deserialize() {
-            let row: ConfigRow = result.map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+            let row: ComposeTask = result.map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
             rows.push(row);
         }
 
@@ -116,29 +114,25 @@ pub(crate) struct ManifestRow {
     pub(crate) abundance: f64,
     pub(crate) fasta: String,
     pub(crate) genome_length: usize,
-    pub(crate) model: String,
     pub(crate) circular: bool,
     pub(crate) sub_rate: f64,
     pub(crate) indel_rate: f64,
-    pub(crate) read_length: usize,
     // The calculated read allocation
     pub(crate) calculated_reads: usize,
 }
 
 impl ManifestRow {
     /// Upgrades a raw config row into a manifest plan row by appending the read count
-    pub(crate) fn from_config_row(row: ConfigRow, calculated_reads: usize) -> Self {
+    pub(crate) fn from_config_row(row: ComposeTask, calculated_reads: usize) -> Self {
         Self {
             id: row.id,
             keyword: row.keyword,
             abundance: row.abundance,
             fasta: row.fasta,
             genome_length: row.genome_length,
-            model: row.model,
             circular: row.circular,
             sub_rate: row.sub_rate,
             indel_rate: row.indel_rate,
-            read_length: row.read_length,
             calculated_reads,
         }
     }
@@ -150,7 +144,7 @@ pub(crate) struct Manifest {
 
 impl Manifest {
     /// Generates a concrete execution manifest from a configuration map
-    pub(crate) fn from_config(config: &Config, total_reads: usize, mode: AbundanceMode) -> Self {
+    pub(crate) fn from_config(config: &ComposeConfig, total_reads: usize, mode: AbundanceMode) -> Self {
         let mut manifest_rows: Vec<ManifestRow> = Vec::with_capacity(config.rows.len());
         if config.rows.is_empty() {
             return Self { rows: manifest_rows };
@@ -210,7 +204,7 @@ impl Manifest {
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct AnalyzeRow {
-    pub(crate) id: String,      // E.g., "Ecoli_K12" -> matches read header `@{id}:...`
+    pub(crate) id: String,      // E.g., "GRCh38" -> matches read header `@{id}:...`
     pub(crate) keyword: String, // Keyword used in generating reads @id:keyword:accession:read_number
     pub(crate) calculated_reads: usize,    // The calculated read allocation from compose step
 }

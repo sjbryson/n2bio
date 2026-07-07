@@ -3,13 +3,16 @@
 
 use std::io;
 use std::fs;
+use std::time::Instant;
+
 use crate::cli::{ComposeArgs, GenerateArgs};
-use crate::config::{Config, Manifest};
+use crate::config::{ComposeConfig, Manifest};
 use crate::generate;
 
 pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
+    let start_time: Instant = Instant::now();
     // 1. Load the input configuration, calculate genome lengths, and validate circularity
-    let mut config: Config = Config::from_tsv(&args.config)?;
+    let mut config: ComposeConfig = ComposeConfig::from_tsv(&args.config)?;
     println!("Validating reference FASTA metrics and parsing genome lengths...");
     config.validate_and_compute_lengths()?;
     
@@ -25,8 +28,8 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     //    Could change to raise overwrite warning...
     let global_r1: String = format!("{}.r1.fq.gz", args.prefix);
     let global_r2: String = format!("{}.r2.fq.gz", args.prefix);
-    let _ = fs::remove_file(&global_r1);
-    let _ = fs::remove_file(&global_r2);
+    fs::remove_file(&global_r1).ok();
+    fs::remove_file(&global_r2).ok();
 
     // 5. Execute the manifest actions sequentially, appending sim reads to the global files
     for row in &manifest.rows {
@@ -41,13 +44,14 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
             prefix: row.id.clone(), 
             keyword: row.keyword.clone(),
             fasta: row.fasta.clone(),
-            model: row.model.clone(),
+            model: args.model.clone(),
             num_reads: row.calculated_reads,
-            read_length: row.read_length,
+            read_length: args.read_length,
             sub_rate: row.sub_rate,
             indel_rate: row.indel_rate,
             threads: args.threads,
             circular: row.circular,
+            vary_lengths: args.vary_lengths,
             append_mode: true,
             append_path: Some(args.prefix.clone()), 
         };
@@ -58,6 +62,7 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     println!("Simulation complete! {} paired reads saved to:", args.total_reads);
     println!("  R1 -> {}", global_r1);
     println!("  R2 -> {}", global_r2);
+    println!("Runtime: {:.2} seconds", start_time.elapsed().as_secs_f64());
 
     Ok(())
 }

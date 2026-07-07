@@ -3,10 +3,11 @@
 
 use std::io::{self, Error, ErrorKind};
 use std::thread;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use rand::rngs::SmallRng;
+use rand::RngExt;
 use std::time::Instant;
 use std::path::PathBuf;
 
@@ -17,7 +18,7 @@ use n2core::fastq::{FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWri
 use n2core::sequence::DnaSequence; 
 
 use crate::cli::GenerateArgs;
-use crate::simstats::{ LibraryModel, InsertSize, QualityScores };
+use crate::modelstats::ModelStats;
 use crate::genome::ReferenceGenome;
 use crate::mutate::{Mutator, MutationStats};
 
@@ -29,21 +30,21 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let start_time: Instant = Instant::now();
     println!("Generating {} reads from {:?}", args.num_reads, args.fasta);
 
-    let read_length: usize = args.read_length; 
     let deletion_buffer: usize = 20;
     
     // 1. Initialize the FastaReader and load the weighted ReferenceGenome
     let ref_reader: FastaReader<ReaderType> = FastaReader::open(&args.fasta)?;
     let reference: ReferenceGenome = ReferenceGenome::load(ref_reader, 1000, args.circular)?;
     
-    // 2. Load model, initialize mutator and samplers
+    // 2. Load the empirical model and initialize mutator
     let model_path: &str = &args.model;
-    let model: LibraryModel = LibraryModel::from_file(model_path)
-        .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
-    let inserts: InsertSize = InsertSize::new(&model.insert_size)
-        .map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let qualities: QualityScores = QualityScores::new(&model.quality)
-        .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let file: File = File::open(model_path)?;
+    let mut model: ModelStats = serde_json::from_reader(file)
+        .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to load model: {}", e)))?;
+    
+    // Compile the Cumulative Distribution Functions (CDFs) for rapid sampling
+    model.compile_cdf();
+
     let mutator: Mutator = Mutator::new(args.sub_rate, args.indel_rate);
     
     // 3. Setup global thread pool for Rayon based on user args
@@ -99,10 +100,7 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
     let batch_size: usize = 10_000;
     let num_batches: usize = (args.num_reads as f64 / batch_size as f64).ceil() as usize;
 
-    // 7. Set min insert size
-    let min_insert_size: usize = read_length + deletion_buffer;
-
-    // 8. Iterate over batches
+    // 7. Iterate over batches (Rayon captures &model by reference)
     (0..num_batches).into_par_iter().for_each_with(tx, |sender, batch_idx| {
         
         let mut rng: SmallRng = rand::make_rng();
@@ -114,26 +112,47 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
         for local_i in 0..reads_this_batch {
             let global_read_id: usize = start_read_id + local_i;
 
-            // A. Sample an insert size
-            let mut insert_size: usize = inserts.sample(&mut rng);
-            while insert_size < min_insert_size {
-                insert_size = inserts.sample(&mut rng);
+            // A. Determine Read Lengths
+            let r1_len: usize = if args.vary_lengths {
+                model.r1_lengths.sample(rng.random::<f64>()).round() as usize
+            } else {
+                args.read_length
+            };
+            
+            let r2_len: usize = if args.vary_lengths {
+                model.r2_lengths.sample(rng.random::<f64>()).round() as usize
+            } else {
+                args.read_length
+            };
+
+            // B. Sample an insert size with safety fallback
+            let min_insert_size: usize = std::cmp::max(r1_len, r2_len) + deletion_buffer + 1;
+            
+            let mut insert_size: usize = 0;
+            for _ in 0..100 {
+                insert_size = model.insert_sizes.sample(rng.random::<f64>()).round() as usize;
+                if insert_size >= min_insert_size { break; }
+            }
+            
+            // Fallback if the empirical model doesn't support inserts this large
+            if insert_size < min_insert_size {
+                insert_size = min_insert_size;
             }
 
-            // B. Grab a slice of the genome equal to the INSERT SIZE
+            // C. Grab a slice of the genome equal to the INSERT SIZE
             let (accession, raw_insert_slice) = reference.sample_slice(&mut rng, insert_size, deletion_buffer);
 
-            // C. Mutate R1 from the beginning of the insert slice
-            let r1_stats: MutationStats = mutator.mutate(raw_insert_slice, read_length, &mut rng);
+            // D. Mutate R1 from the beginning of the insert slice
+            let r1_stats: MutationStats = mutator.mutate(raw_insert_slice, r1_len, &mut rng);
 
-            // D. Mutate R2 from the end of the insert slice
-            let r2_start: usize = raw_insert_slice.len().saturating_sub(read_length + deletion_buffer);
-            let mut r2_stats: MutationStats = mutator.mutate(&raw_insert_slice[r2_start..], read_length, &mut rng);
+            // E. Mutate R2 from the end of the insert slice
+            let r2_start: usize = raw_insert_slice.len().saturating_sub(r2_len + deletion_buffer);
+            let mut r2_stats: MutationStats = mutator.mutate(&raw_insert_slice[r2_start..], r2_len, &mut rng);
             
-            // E. Reverse complement Read 2
+            // F. Reverse complement Read 2
             r2_stats.sequence = r2_stats.sequence.reverse_complement();
 
-            // F. Format headers
+            // G. Format headers
             let r1_base_id: String = format!("{}:{}:{}:{} 1:N:{}:{}:{}",
                 args.prefix, args.keyword, accession, global_read_id, r1_stats.subs, r1_stats.insertions, r1_stats.deletions, 
             );
@@ -142,11 +161,24 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
                 args.prefix, args.keyword, accession, global_read_id, r2_stats.subs, r2_stats.insertions, r2_stats.deletions, 
             );
 
-            // G. Generate qualities
-            let r1_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 1);
-            let r2_qual: Vec<u8> = qualities.generate(&mut rng, read_length, 2);
+            // H. Generate empirical qualities via CDF sampling
+            let max_model_cycle = model.max_read_length.saturating_sub(1);
+            
+            let mut r1_qual: Vec<u8> = Vec::with_capacity(r1_len);
+            for cycle in 0..r1_len {
+                let safe_cycle = cycle.min(max_model_cycle);
+                let q = model.r1_qualities[safe_cycle].sample(rng.random::<f64>()).round() as u8;
+                r1_qual.push(q + 33); // Offset for printable ASCII
+            }
 
-            // H. Convert Vec<u8> buffers to Strings
+            let mut r2_qual: Vec<u8> = Vec::with_capacity(r2_len);
+            for cycle in 0..r2_len {
+                let safe_cycle = cycle.min(max_model_cycle);
+                let q = model.r2_qualities[safe_cycle].sample(rng.random::<f64>()).round() as u8;
+                r2_qual.push(q + 33); // Offset for printable ASCII
+            }
+
+            // I. Convert Vec<u8> buffers to Strings
             let (r1_seq_str, r1_qual_str, r2_seq_str, r2_qual_str) = unsafe {
                 (
                     String::from_utf8_unchecked(r1_stats.sequence),
@@ -156,7 +188,7 @@ pub(crate) fn run(args: GenerateArgs) -> io::Result<()> {
                 )
             };
 
-            // I. Package and push to batch
+            // J. Package and push to batch
             let r1_record: FastqRecord<Read1> = FastqRecord::<Read1>::new(r1_base_id, r1_seq_str, r1_qual_str);
             let r2_record: FastqRecord<Read2> = FastqRecord::<Read2>::new(r2_base_id, r2_seq_str, r2_qual_str);
 
