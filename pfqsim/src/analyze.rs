@@ -11,7 +11,7 @@ use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
 
 use crate::config::AnalyzeConfig;
 use crate::cli::{ AnalyzeArgs, MappingMode };
-use crate::report::{ AnalyzeReportData, MetricPayload, generate_evaluation_report };
+use crate::report::{ AnalyzeReportData, MetricPayload, generate_evaluation_reports };
 
     
 pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
@@ -36,18 +36,20 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         .map(|row| row.calculated_reads)
         .sum();
 
-    // Pass them both into the payload
-    let mut report_data = AnalyzeReportData {
+    // Initialize the updated Report Data payload
+    let mut report_data: AnalyzeReportData = AnalyzeReportData {
         report_name: args.output.clone(),
-        total_expected_pairs: total_expected_positives,
-        total_expected_negative_pairs: total_expected_negatives,
-        total_observed_pairs: 0,
-        positives: MetricPayload::default(),
-        negatives_control: MetricPayload::default(),
-        negatives_cross: MetricPayload::default(),
+        total_expected_positives,
+        total_expected_negatives,
+        total_observed: 0,
+        unmapped_true_negatives: 0,
+        unmapped_false_negatives: 0,
+        true_positives: MetricPayload::new(),
+        false_positives_control: MetricPayload::new(),
+        false_positives_cross: MetricPayload::new(),
     };
 
-    println!("Processing name-sorted BAM tracking pipeline: {}", args.bam);
+    println!("Processing name-sorted BAM: {}", args.bam);
     let mut bam_reader: BamReader = BamReader::open(&args.bam)?;
     let header: BamHeader = bam_reader.read_header()?;
 
@@ -60,7 +62,7 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
         if current_record.read_name != prev_qname {
             if !prev_qname.is_empty() {
                 if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-                    report_data.total_observed_pairs += 1;
+                    report_data.total_observed += 1;
                     evaluate_and_accumulate_pair(&r1, &r2, &header, &reference_map, &args.mapping_mode, &mut report_data);
                 }
             }
@@ -81,7 +83,7 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
     // Process final records
     if !prev_qname.is_empty() {
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-            report_data.total_observed_pairs += 1;
+            report_data.total_observed += 1;
             evaluate_and_accumulate_pair(&r1, &r2, &header, &reference_map, &args.mapping_mode, &mut report_data);
         }
     }
@@ -91,11 +93,19 @@ pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
     if out_html_path.extension().is_none() {
         out_html_path.set_extension("html");
     }
-
-    println!("Processing metric data vectors and writing HTML report ...");
-    generate_evaluation_report(&mut report_data, &out_html_path)?;
     
-    println!("Evaluation completed successfully. Report dashboard ready at: {}", out_html_path.display());
+    // Create accompanying JSON file path
+    let mut out_json_path: PathBuf = out_html_path.clone();
+    out_json_path.set_extension("json");
+
+    println!("Processing metric histograms and writing HTML/JSON reports ...");
+    report_data.trim();
+    generate_evaluation_reports(&report_data, &out_html_path, &out_json_path)?;
+    
+    println!("Evaluation completed successfully.\nHTML Dashboard: {}\nRaw JSON Data: {}", 
+        out_html_path.display(), 
+        out_json_path.display()
+    );
     Ok(())
 }
 
@@ -104,7 +114,7 @@ fn load_reference_map(path: String) -> io::Result<HashMap<String, String>> {
     let file: File = File::open(PathBuf::from(path))?;
     let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
         .delimiter(b'\t')
-        .has_headers(false) // Assuming no headers, otherwise change to true
+        .has_headers(false)
         .from_reader(file);
 
     let mut map: HashMap<String, String> = HashMap::new();
@@ -117,7 +127,7 @@ fn load_reference_map(path: String) -> io::Result<HashMap<String, String>> {
     Ok(map)
 }
 
-/// Determines if a pair matches the ground-truth assignment and moves scores into the appropriate target vectors
+/// Determines if a pair matches the ground-truth assignment and increments scores in the appropriate target histograms
 fn evaluate_and_accumulate_pair(
     r1: &BamRecord,
     r2: &BamRecord,
@@ -148,56 +158,62 @@ fn evaluate_and_accumulate_pair(
         None => return, 
     };
 
-    // Get the alignment target name
-    if r1.ref_id < 0 || (r1.ref_id as usize) >= header.references.len() {
-        return; // Unmapped read counts towards False Negatives
-    }
-    let mapped_target_name: &String = &header.references[r1.ref_id as usize].name;
-
-    // Determine the expected ground-truth value based on CLI mapping mode
+    // Determine the expected ground-truth value based on mapping mode
     let expected_truth_value: &str = match mapping_mode {
         MappingMode::ReadId => source_id,
         MappingMode::ReadKeyword => keyword,
         MappingMode::ReadAccession => true_accession,
     };
 
-    // Evaluate alignment
-    let is_negative_control = expected_truth_value.eq_ignore_ascii_case("negative");
+    let is_negative_control: bool = expected_truth_value.eq_ignore_ascii_case("negative");
 
-    let target_pool = if is_negative_control {
-        // It's a negative control that managed to align -> FP (Control)
-        &mut report_data.negatives_control
+    // Check if the read is unmapped (or invalid ref_id)
+    if r1.ref_id < 0 || (r1.ref_id as usize) >= header.references.len() {
+        if is_negative_control {
+            report_data.unmapped_true_negatives += 1;
+        } else {
+            report_data.unmapped_false_negatives += 1;
+        }
+        return; // No alignment metrics to capture for unmapped reads
+    }
+
+    // Read mapped successfully, evaluate correctness
+    let mapped_target_name: &String = &header.references[r1.ref_id as usize].name;
+
+    let target_pool: &mut MetricPayload = if is_negative_control {
+        // Negative control that aligned -> FP
+        &mut report_data.false_positives_control
     } else if let Some(mapped_classification) = reference_map.get(mapped_target_name) {
         if mapped_classification == expected_truth_value {
             // Correct target mapping -> TP
-            &mut report_data.positives
+            &mut report_data.true_positives
         } else {
-            // Wrong target mapping -> FP (Cross-Contamination)
-            &mut report_data.negatives_cross
+            // Wrong target mapping -> FP
+            &mut report_data.false_positives_cross
         }
     } else {
-        // Mapped to a reference not in our map at all -> FP (Cross-Contamination)
-        &mut report_data.negatives_cross 
+        // Mapped to a reference not in mapping -> FP
+        &mut report_data.false_positives_cross 
     };
 
-    // Append alignment data profiles into vectors
+    // Increment histogram bins directly via the `.increment()` method
     for record in &[r1, r2] {
-        target_pool.mapq.push(record.mapq as f64);
+        target_pool.mapq.increment(record.mapq as f64);
         
         if let Some(val) = record.get_int_tag(b"AS") {
-            target_pool.align_score.push(val as f64);
+            target_pool.align_score.increment(val as f64);
         }
         if let Some(val) = record.calculate_alignment_length() {
-            target_pool.align_length.push(val as f64);
+            target_pool.align_length.increment(val as f64);
         }
         if let Some(val) = record.calculate_as_al() {
-            target_pool.as_al.push(val as f64);
+            target_pool.as_al.increment(val as f64);
         }
         if let Some(val) = record.calculate_alignment_proportion() {
-            target_pool.align_proportion.push(val as f64);
+            target_pool.align_proportion.increment(val as f64);
         }
         if let Some(val) = record.calculate_alignment_accuracy() {
-            target_pool.align_accuracy.push(val as f64);
+            target_pool.align_accuracy.increment(val as f64);
         }
     }
 }

@@ -1,10 +1,64 @@
 //! n2bio/pfqsim/src/report.rs
 //! 
 
-use std::fs;
+use std::fs::{self, File};
 use std::path::PathBuf;
 use std::io;
 use serde::{Serialize, Deserialize};
+
+// ============================================================================
+// Core Histogram Logic
+// ============================================================================
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum HistType {
+    Integer { min: f64, max: f64 },
+    Float { min: f64, max: f64, bin_width: f64 },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct Histogram {
+    pub(crate) min_val: f64,
+    pub(crate) max_val: f64,
+    pub(crate) bin_width: f64,
+    pub(crate) counts: Vec<usize>,
+}
+
+impl Histogram {
+    pub(crate) fn new(hist_type: HistType) -> Self {
+        let (min_val, max_val, bin_width) = match hist_type {
+            HistType::Integer { min, max } => (min, max, 1.0),
+            HistType::Float { min, max, bin_width } => (min, max, bin_width),
+        };
+        let num_bins: usize = ((max_val - min_val) / bin_width).ceil() as usize + 1;
+        Self { min_val, max_val, bin_width, counts: vec![0; num_bins] }
+    }
+
+    pub(crate) fn increment(&mut self, value: f64) {
+        let clamped: f64 = value.clamp(self.min_val, self.max_val);
+        let bin_index: usize = ((clamped - self.min_val) / self.bin_width).round() as usize;
+        if let Some(bin) = self.counts.get_mut(bin_index) {
+            *bin += 1;
+        }
+    }
+    
+    pub(crate) fn total_count(&self) -> usize {
+        self.counts.iter().sum()
+    }
+
+    pub(crate) fn trim(&mut self) {
+        if let Some(last_active_index) = self.counts.iter().rposition(|&count| count > 0) {
+            // Truncate the vector to remove all trailing zeros
+            self.counts.truncate(last_active_index + 1);
+            // Adjust max_val to reflect the actual highest bin in the trimmed data
+            self.max_val = self.min_val + (last_active_index as f64 * self.bin_width);
+        } else {
+            // If the histogram is completely empty, collapse it to a single zero bin
+            self.counts.truncate(1);
+            self.max_val = self.min_val;
+        }
+    }
+}
 
 // ============================================================================
 // Report data
@@ -14,36 +68,68 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AnalyzeReportData {
     pub(crate) report_name: String,
-    pub(crate) total_expected_pairs: usize,
-    pub(crate) total_expected_negative_pairs: usize,
-    pub(crate) total_observed_pairs: usize,
     
-    // Arrays of score points extracted from alignment pairs
-    pub(crate) positives: MetricPayload,
-    pub(crate) negatives_control: MetricPayload, // For negative controls that map
-    pub(crate) negatives_cross: MetricPayload,
+    // Ground Truth
+    pub(crate) total_expected_positives: usize, 
+    pub(crate) total_expected_negatives: usize, 
+    pub(crate) total_observed: usize,
+    
+    // Unmapped Counts
+    pub(crate) unmapped_true_negatives: usize, 
+    pub(crate) unmapped_false_negatives: usize,
+
+    // Mapped Histograms
+    // Reads that mapped correctly (Subject to becoming FN if threshold raised)
+    pub(crate) true_positives: MetricPayload, 
+    
+    // Control reads that incorrectly mapped (Subject to becoming TN if threshold raised)
+    pub(crate) false_positives_control: MetricPayload, 
+    
+    // Target reads that incorrectly mapped (FP)
+    pub(crate) false_positives_cross: MetricPayload, 
 }
 
-/// Pre-sorted vectors of stats for binary thresholding
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+impl AnalyzeReportData {
+    /// Cascades the trim operation to all target pools
+    pub(crate) fn trim(&mut self) {
+        self.true_positives.trim();
+        self.false_positives_control.trim();
+        self.false_positives_cross.trim();
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct MetricPayload {
-    pub(crate) mapq: Vec<f64>,
-    pub(crate) align_score: Vec<f64>,
-    pub(crate) align_length: Vec<f64>,
-    pub(crate) as_al: Vec<f64>,
-    pub(crate) align_proportion: Vec<f64>,
-    pub(crate) align_accuracy: Vec<f64>,
+    pub(crate) mapq: Histogram,
+    pub(crate) align_score: Histogram,
+    pub(crate) align_length: Histogram,
+    pub(crate) as_al: Histogram,
+    pub(crate) align_proportion: Histogram,
+    pub(crate) align_accuracy: Histogram,
 }
 
 impl MetricPayload {
-    /// Sort vectors in-place so JavaScript can execute binary searches
-    pub(crate) fn sort_all(&mut self) {
-        self.mapq.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        self.align_score.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        self.align_length.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        self.as_al.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        self.align_proportion.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        self.align_accuracy.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    /// Initializes histograms with sensible boundaries for typical short-read alignments.
+    /// Adjust max limits (like align_score 1000) if you are working with long reads!
+    pub(crate) fn new() -> Self {
+        Self {
+            mapq: Histogram::new(HistType::Integer { min: 0.0, max: 60.0 }),
+            align_score: Histogram::new(HistType::Integer { min: 0.0, max: 1000.0 }),
+            align_length: Histogram::new(HistType::Integer { min: 0.0, max: 1000.0 }),
+            as_al: Histogram::new(HistType::Float { min: 0.0, max: 2.0, bin_width: 0.01 }),
+            align_proportion: Histogram::new(HistType::Float { min: 0.0, max: 1.0, bin_width: 0.01 }),
+            align_accuracy: Histogram::new(HistType::Float { min: 0.0, max: 1.0, bin_width: 0.01 }),
+        }
+    }
+
+    /// Cascades the trim operation to all histograms in the payload
+    pub(crate) fn trim(&mut self) {
+        self.mapq.trim();
+        self.align_score.trim();
+        self.align_length.trim();
+        self.as_al.trim();
+        self.align_proportion.trim();
+        self.align_accuracy.trim();
     }
 }
 
@@ -51,26 +137,31 @@ impl MetricPayload {
 // HTML report
 // ============================================================================
 
-pub(crate) fn generate_evaluation_report(
-    data: &mut AnalyzeReportData, 
-    html_path: &PathBuf
+/// Generates both the HTML dashboard and the raw JSON data file
+pub(crate) fn generate_evaluation_reports(
+    data: &AnalyzeReportData, 
+    html_path: &PathBuf,
+    json_path: &PathBuf,
 ) -> io::Result<()> {
     
-    // Sort elements for client-side binary search logic
-    data.positives.sort_all();
-    data.negatives_control.sort_all();
-    data.negatives_cross.sort_all();
+    // 1. Write the JSON file report
+    let json_file = File::create(json_path)?;
+    serde_json::to_writer_pretty(json_file, data).map_err(|e| {
+        io::Error::new(io::ErrorKind::InvalidData, format!("JSON file write error: {}", e))
+    })?;
 
+    // 2. Serialize raw JSON string for HTML embedding
     let json_raw: String = serde_json::to_string(data).map_err(|e| {
         io::Error::new(io::ErrorKind::InvalidData, format!("JSON serialization error: {}", e))
     })?;
 
+    // 3. Generate HTML
     let html_content: String = format!(r#"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>pfqsim Benchmark Report: {name}</title>
+    <title>PFQSIM Report: {name}</title>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }}
@@ -85,23 +176,23 @@ pub(crate) fn generate_evaluation_report(
         .divider:not(:empty)::after {{ margin-left: 15px; }}
 
         /* Layout Grids */
-        .dashboard-grid {{ display: grid; grid-template-columns: 350px 1fr 1fr; gap: 25px; margin-bottom: 30px; }}
-        .curves-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }}
+        .dashboard-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }}
+        .curves-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }}
 
         /* Panel Cards */
         .panel {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; }}
-        .panel-title {{ font-size: 14px; font-weight: bold; color: #334155; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }}
+        .panel-title {{ text-align: center; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }}
 
         /* Interactive Widgets */
-        .control-group {{ margin-bottom: 20px; }}
+        .control-group {{ margin-bottom: 15px; }}
         label {{ display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; }}
         select, input[type=range] {{ width: 100%; box-sizing: border-box; }}
-        .slider-meta {{ display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 4px; }}
+        .slider-meta {{ display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 4px; }}
         .active-val {{ font-weight: bold; color: #2563eb; }}
 
         /* Matrix Table Styling */
-        .matrix-table {{ width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; }}
-        .matrix-table th, .matrix-table td {{ padding: 10px; border: 1px solid #cbd5e1; }}
+        .matrix-table {{ width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; }}
+        .matrix-table th, .matrix-table td {{ padding: 8px; border: 1px solid #cbd5e1; }}
         .matrix-table th {{ background: #f1f5f9; color: #475569; font-weight: 600; }}
         .matrix-label {{ text-align: left; font-weight: bold; background: #f1f5f9; color: #475569; }}
         .cell-tp {{ background: #dcfce7; font-weight: bold; color: #166534; }}
@@ -119,15 +210,75 @@ pub(crate) fn generate_evaluation_report(
 </head>
 <body>
     <div class="container">
-        <h1>pfqsim Classifier Assessment Benchmark</h1>
-        <div class="subtitle">Dataset Baseline Target: {name}</div>
+        <h1>PfqSim Classifier Assessment</h1>
+        <div class="subtitle">{name}</div>
 
-        <div class="divider">Dynamic Operating Characteristics Threshold Engine</div>
+        <div class="divider">Dynamic Threshold Report</div>
 
         <div class="dashboard-grid">
             <div class="panel">
-                <div class="panel-title">Threshold Controllers</div>
-                
+                <div class="panel-title">Summary</div>
+                <ul class="stat-list">
+                    <li><span class="stat-label">Expected Positive Pairs</span><span class="stat-value">{expected}</span></li>
+                    <li><span class="stat-label">Expected Negative Pairs</span><span class="stat-value">{expected_neg}</span></li>
+                    <li><span class="stat-label">Observed Primary Alignments</span><span class="stat-value">{observed}</span></li>
+                    <li><span class="stat-label">Total Valid Placements</span><span class="stat-value">{tp_count}</span></li>
+                    <li><span class="stat-label">Total Error Placements</span><span class="stat-value">{fp_count}</span></li>
+                </ul>
+
+                <div class="panel-title" style="margin-top:25px;">Dynamic Metrics</div>
+                <ul class="stat-list">
+                    <li><span class="stat-label">Precision (PPV)</span><span id="stat_precision" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Recall - TPR (Sensitivity)</span><span id="stat_recall" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Specificity (TNR)</span><span id="stat_specificity" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Accuracy</span><span id="stat_accuracy" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Negative Pred Value (NPV)</span><span id="stat_npv" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Prevalence</span><span id="stat_prevalence" class="stat-value">-</span></li>
+                    <li><span class="stat-label">False Positive Rate (FPR)</span><span id="stat_fpr" class="stat-value">-</span></li>
+                    <li><span class="stat-label">F1-Score</span><span id="stat_f1" class="stat-value">-</span></li>
+                </ul>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">Dynamic Confusion Matrix</div>
+                <table class="matrix-table">
+                    <tr>
+                        <th colspan="2" rowspan="2"></th>
+                        <th colspan="2">Predicted</th>
+                    </tr>
+                    <tr>
+                        <th>Positive (&ge; Threshold)</th>
+                        <th>Negative (&lt; Threshold)</th>
+                    </tr>
+                    <tr>
+                        <th rowspan="2" style="writing-mode: vertical-lr; transform: rotate(180deg); font-size:10px;">Actual</th>
+                        <td class="matrix-label">Positive</td>
+                        <td class="cell-tp">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">True Positive (TP)</div>
+                            <div id="cell_tp" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-fn">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">False Negative (FN)</div>
+                            <div id="cell_fn" style="font-size:16px;">-</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="matrix-label">Negative</td>
+                        <td class="cell-fp">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">False Positive (FP)</div>
+                            <div id="cell_fp" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-tn">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">True Negative (TN)</div>
+                            <div id="cell_tn" style="font-size:16px;">-</div>
+                        </td>
+                    </tr>
+                </table>
+                <p style="font-size:10px; color:#64748b; line-height:1.4; margin-top:15px; margin-bottom: 25px;">
+                    * <strong>False Negatives (FN)</strong> represent simulated expected alignments that were rejected by the threshold filter or dropped entirely as unmapped.
+                </p>
+
+                <div class="panel-title">Threshold Controller</div>
                 <div class="control-group">
                     <label for="metric_selector">Target Diagnostic Feature</label>
                     <select id="metric_selector">
@@ -149,64 +300,6 @@ pub(crate) fn generate_evaluation_report(
                         <span id="slider_max">100</span>
                     </div>
                 </div>
-
-                <div class="panel-title" style="margin-top:25px;">Dynamic Metrics</div>
-                <ul class="stat-list">
-                    <li><span class="stat-label">Precision (PPV)</span><span id="stat_precision" class="stat-value">-</span></li>
-                    <li><span class="stat-label">Recall / TPR (Sensitivity)</span><span id="stat_recall" class="stat-value">-</span></li>
-                    <li><span class="stat-label">False Positive Rate (FPR)</span><span id="stat_fpr" class="stat-value">-</span></li>
-                    <li><span class="stat-label">F1-Score</span><span id="stat_f1" class="stat-value">-</span></li>
-                </ul>
-            </div>
-
-            <div class="panel">
-                <div class="panel-title">Dynamic Confusion Matrix</div>
-                <table class="matrix-table">
-                    <tr>
-                        <th colspan="2" rowspan="2"></th>
-                        <th colspan="2">Actual Condition (Ground Truth)</th>
-                    </tr>
-                    <tr>
-                        <th>Positive (Target)</th>
-                        <th>Negative (Control/Noise)</th>
-                    </tr>
-                    <tr>
-                        <th rowspan="2" style="writing-mode: vertical-lr; transform: rotate(180deg); font-size:11px;">Predicted Condition (Aligner Decision)</th>
-                        <td class="matrix-label">Positive (&ge; Threshold)</td>
-                        <td class="cell-tp">
-                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">True Positive (TP)</div>
-                            <div id="cell_tp" style="font-size:16px;">-</div>
-                        </td>
-                        <td class="cell-fp">
-                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">False Positive (FP)</div>
-                            <div id="cell_fp" style="font-size:16px;">-</div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="matrix-label">Negative (&lt; Threshold)</td>
-                        <td class="cell-fn">
-                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">False Negative (FN)</div>
-                            <div id="cell_fn" style="font-size:16px;">-</div>
-                        </td>
-                        <td class="cell-tn">
-                            <div style="font-size:10px; font-weight:normal; margin-bottom:4px;">True Negative (TN)</div>
-                            <div id="cell_tn" style="font-size:16px;">-</div>
-                        </td>
-                    </tr>
-                </table>
-                <p style="font-size:11px; color:#64748b; line-height:1.4; margin-top:15px;">
-                    * <strong>False Negatives (FN)</strong> represent simulated expected alignments that were rejected by the threshold filter or dropped entirely as unmapped.
-                </p>
-            </div>
-
-            <div class="panel">
-                <div class="panel-title">Simulation Summary Profile</div>
-                <ul class="stat-list">
-                    <li><span class="stat-label">Expected Target Pairs</span><span class="stat-value">{expected}</span></li>
-                    <li><span class="stat-label">Observed Primary Pairs</span><span class="stat-value">{observed}</span></li>
-                    <li><span class="stat-label">Total Valid Placements</span><span class="stat-value">{tp_count}</span></li>
-                    <li><span class="stat-label">Total Error Placements</span><span class="stat-value">{fp_count}</span></li>
-                </ul>
             </div>
         </div>
 
@@ -218,23 +311,46 @@ pub(crate) fn generate_evaluation_report(
 
     <script>
         const payload = {json_raw};
+        const metrics = ['align_score', 'align_length', 'as_al', 'align_proportion', 'align_accuracy', 'mapq'];
 
-        // Binary Search lookup helper
-        function countGreaterOrEqual(arr, threshold) {{
-            let low = 0;
-            let high = arr.length;
-            while (low < high) {{
-                let mid = (low + high) >> 1;
-                if (arr[mid] >= threshold) {{
-                    high = mid;
-                }} else {{
-                    low = mid + 1;
-                }}
+        // 1. O(N) Pre-computation: Build Suffix Sums on page load
+        function initHistograms() {{
+            for (let key of metrics) {{
+                [payload.true_positives[key], payload.false_positives_control[key], payload.false_positives_cross[key]].forEach(hist => {{
+                    let total_bins = hist.counts.length;
+                    hist.suffix_sums = new Array(total_bins).fill(0);
+                    
+                    let running = 0;
+                    for (let i = total_bins - 1; i >= 0; i--) {{
+                        running += hist.counts[i];
+                        hist.suffix_sums[i] = running;
+                    }}
+                }});
             }}
-            return arr.length - low;
+        }}
+        initHistograms();
+
+        // 2. O(1) Threshold Lookup
+        function countGreaterOrEqual(histogram, threshold) {{
+            let bin_index = Math.round((threshold - histogram.min_val) / histogram.bin_width);
+            
+            if (bin_index < 0) return histogram.suffix_sums[0] || 0;
+            if (bin_index >= histogram.counts.length) return 0;
+            
+            return histogram.suffix_sums[bin_index];
         }}
 
-        // Approximates the Area Under Curve (AUC) using the trapezoidal rule
+        // 3. Get bounds directly from Histogram structs
+        function getDynamicConfig(key) {{
+            const hist = payload.true_positives[key];
+            return {{
+                min: hist.min_val,
+                max: hist.max_val,
+                step: hist.bin_width
+            }};
+        }}
+
+        // 4. Approximate AUC using trapezoidal rule
         function calculateAUC(x_arr, y_arr) {{
             let area = 0;
             for (let i = 1; i < x_arr.length; i++) {{
@@ -243,37 +359,6 @@ pub(crate) fn generate_evaluation_report(
                 area += dx * dy;
             }}
             return area;
-        }}
-
-        // Dynamic Configuration builder based on pre-sorted array bounds
-        function getDynamicConfig(key) {{
-            const pos = payload.positives[key];
-            const neg_ctrl = payload.negatives_control[key];
-            const neg_cross = payload.negatives_cross[key];
-            
-            let min_val = Math.min(
-                pos.length > 0 ? pos[0] : Infinity,
-                neg_ctrl.length > 0 ? neg_ctrl[0] : Infinity,
-                neg_cross.length > 0 ? neg_cross[0] : Infinity
-            );
-            
-            let max_val = Math.max(
-                pos.length > 0 ? pos[pos.length - 1] : -Infinity,
-                neg_ctrl.length > 0 ? neg_ctrl[neg_ctrl.length - 1] : -Infinity,
-                neg_cross.length > 0 ? neg_cross[neg_cross.length - 1] : -Infinity
-            );
-
-            if (min_val === Infinity) min_val = 0;
-            if (max_val === -Infinity) max_val = 100;
-            
-            let step = (key === 'as_al' || key === 'align_proportion') ? 0.01 : 1;
-            
-            if (key === 'mapq') {{ min_val = 0; max_val = Math.max(max_val, 60); }}
-            if (key === 'align_accuracy') {{ min_val = 0; max_val = Math.max(max_val, 100); }}
-            
-            if (min_val === max_val) {{ max_val += step; }}
-            
-            return {{ min: min_val, max: max_val, step: step }};
         }}
 
         const metricSelector = document.getElementById('metric_selector');
@@ -300,15 +385,15 @@ pub(crate) fn generate_evaluation_report(
             let roc_x = [], roc_y = [];
             let pr_x = [], pr_y = [];
 
-            let total_sim_positives = payload.total_expected_pairs * 2; 
-            let total_sim_negatives = payload.total_expected_negative_pairs * 2;
-            let total_negatives_pool = total_sim_negatives + payload.negatives_cross[key].length;
+            let total_sim_positives = payload.total_expected_positives * 2; 
+            let total_sim_negatives = payload.total_expected_negatives * 2;
+            let total_negatives_pool = total_sim_negatives + countGreaterOrEqual(payload.false_positives_cross[key], config.min); // Using counts for baseline
 
             for(let i = 0; i <= steps; i++) {{
                 let t = config.min + ((config.max - config.min) * (i / steps));
-                let tp = countGreaterOrEqual(payload.positives[key], t);
-                let fp_control = countGreaterOrEqual(payload.negatives_control[key], t);
-                let fp_cross = countGreaterOrEqual(payload.negatives_cross[key], t);
+                let tp = countGreaterOrEqual(payload.true_positives[key], t);
+                let fp_control = countGreaterOrEqual(payload.false_positives_control[key], t);
+                let fp_cross = countGreaterOrEqual(payload.false_positives_cross[key], t);
                 let fp = fp_control + fp_cross;
                 let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
                 let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
@@ -322,22 +407,19 @@ pub(crate) fn generate_evaluation_report(
             }}
 
             // Enforce ROC anchors
-            // If the lowest threshold didn't reach 100% FPR/TPR, anchor the start to (1, 1)
             if (roc_x[0] < 1.0 || roc_y[0] < 1.0) {{
                 roc_x.unshift(1.0);
                 roc_y.unshift(1.0);
             }}
-            // If the highest threshold didn't reach 0% FPR/TPR, anchor the end to (0, 0)
             if (roc_x[roc_x.length - 1] > 0.0 || roc_y[roc_y.length - 1] > 0.0) {{
                 roc_x.push(0.0);
                 roc_y.push(0.0);
             }}
 
             // Enforce PR anchor
-            // If the highest threshold didn't force recall (TPR) all the way to 0, anchor end to (0, 1)
             if (pr_x[pr_x.length - 1] > 0.0) {{
                 pr_x.push(0.0);
-                pr_y.push(1.0); // Convention dictates precision is 1.0 at 0 recall
+                pr_y.push(1.0); 
             }}
 
             const roc_auc = calculateAUC(roc_x, roc_y);
@@ -374,23 +456,28 @@ pub(crate) fn generate_evaluation_report(
 
             document.getElementById('current_threshold_view').innerText = threshold.toFixed(config.step % 1 === 0 ? 0 : 2);
 
-            let tp = countGreaterOrEqual(payload.positives[key], threshold);
-            let fp_control = countGreaterOrEqual(payload.negatives_control[key], threshold);
-            let fp_cross = countGreaterOrEqual(payload.negatives_cross[key], threshold);
+            let tp = countGreaterOrEqual(payload.true_positives[key], threshold);
+            let fp_control = countGreaterOrEqual(payload.false_positives_control[key], threshold);
+            let fp_cross = countGreaterOrEqual(payload.false_positives_cross[key], threshold);
             
             let fp = fp_control + fp_cross;
             
-            let total_sim_positives = payload.total_expected_pairs * 2;
-            let total_sim_negatives = payload.total_expected_negative_pairs * 2;
-            let total_negatives_pool = total_sim_negatives + payload.negatives_cross[key].length;
+            let total_sim_positives = payload.total_expected_positives * 2;
+            let total_sim_negatives = payload.total_expected_negatives * 2;
+            let total_negatives_pool = total_sim_negatives + countGreaterOrEqual(payload.false_positives_cross[key], config.min);
 
             let fn = total_sim_positives - tp;
-            let tn = total_sim_negatives - fp_control;
+            let tn = total_negatives_pool - fp; // Safely calculated relative to the unified error pool
 
             let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
             let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
             let precision = (tp + fp) > 0 ? (tp / (tp + fp)) : 1.0;
             let f1 = (precision + tpr) > 0 ? (2 * (precision * tpr) / (precision + tpr)) : 0;
+            
+            let specificity = total_negatives_pool > 0 ? (tn / total_negatives_pool) : 0;
+            let accuracy = (total_sim_positives + total_negatives_pool) > 0 ? ((tp + tn) / (total_sim_positives + total_negatives_pool)) : 0;
+            let npv = (tn + fn) > 0 ? (tn / (tn + fn)) : 1.0;
+            let prevalence = (total_sim_positives + total_negatives_pool) > 0 ? (total_sim_positives / (total_sim_positives + total_negatives_pool)) : 0;
 
             document.getElementById('cell_tp').innerText = tp.toLocaleString();
             document.getElementById('cell_fp').innerText = fp.toLocaleString();
@@ -401,6 +488,11 @@ pub(crate) fn generate_evaluation_report(
             document.getElementById('stat_recall').innerText = (tpr * 100).toFixed(2) + '%';
             document.getElementById('stat_fpr').innerText = (fpr * 100).toFixed(2) + '%';
             document.getElementById('stat_f1').innerText = f1.toFixed(4);
+            
+            document.getElementById('stat_specificity').innerText = (specificity * 100).toFixed(2) + '%';
+            document.getElementById('stat_accuracy').innerText = (accuracy * 100).toFixed(2) + '%';
+            document.getElementById('stat_npv').innerText = (npv * 100).toFixed(2) + '%';
+            document.getElementById('stat_prevalence').innerText = (prevalence * 100).toFixed(2) + '%';
 
             Plotly.animate('roc_plot', {{
                 data: [{{}}, {{}}, {{ x: [fpr], y: [tpr] }}],
@@ -423,10 +515,11 @@ pub(crate) fn generate_evaluation_report(
 </html>
 "#,
     name = data.report_name,
-    expected = data.total_expected_pairs,
-    observed = data.total_observed_pairs,
-    tp_count = data.positives.align_score.len(),
-    fp_count = data.negatives_control.align_score.len() + data.negatives_cross.align_score.len(),
+    expected = data.total_expected_positives,
+    expected_neg = data.total_expected_negatives,
+    observed = data.total_observed,
+    tp_count = data.true_positives.align_score.total_count(),
+    fp_count = data.false_positives_control.align_score.total_count() + data.false_positives_cross.align_score.total_count(),
     json_raw = json_raw
     );
 
