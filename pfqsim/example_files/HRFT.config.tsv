@@ -1,0 +1,4 @@
+id	keyword	abundance	fasta	circular	sub_rate	indel_rate
+HG002PAT	HUMAN	0.25	GCA_018852605.3_hg002v1.1.pat_genomic.fna	false	0.0	0.0
+HG002MAT	HUMAN	0.25	GCA_018852615.3_hg002v1.1.mat_genomic.fna	false	0.0	0.0
+GRCm39	NEGATIVE	0.5 GCF_000001635.27_GRCm39_genomic.fna	false	0.0	0.0

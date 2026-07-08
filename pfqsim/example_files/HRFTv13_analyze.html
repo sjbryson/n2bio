@@ -1,0 +1,357 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>PFQSIM Report: HRFTv13_analyze</title>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; }
+        
+        h1 { text-align: center; color: #1e293b; margin-top: 0; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 30px; }
+
+        .divider { display: flex; align-items: center; text-align: center; margin: 40px 0 20px 0; font-size: 16px; font-weight: bold; color: #475569; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 2px solid #e2e8f0; }
+        .divider:not(:empty)::before { margin-right: 15px; }
+        .divider:not(:empty)::after { margin-left: 15px; }
+
+        /* Layout Grids */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .curves-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+
+        /* Panel Cards */
+        .panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; }
+        .panel-title { text-align: center; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+
+        /* Interactive Widgets */
+        .control-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; }
+        select, input[type=range] { width: 100%; box-sizing: border-box; }
+        .slider-meta { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 4px; }
+        .active-val { font-weight: bold; color: #2563eb; }
+
+        /* Matrix Table Styling */
+        .matrix-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; }
+        .matrix-table th, .matrix-table td { padding: 8px; border: 1px solid #cbd5e1; }
+        .matrix-table th { background: #f1f5f9; color: #475569; font-weight: 600; }
+        .matrix-label { text-align: left; font-weight: bold; background: #f1f5f9; color: #475569; }
+        .cell-tp { background: #dcfce7; font-weight: bold; color: #166534; }
+        .cell-fp { background: #fee2e2; font-weight: bold; color: #991b1b; }
+        .cell-fn { background: #fef9c3; font-weight: bold; color: #854d0e; }
+        .cell-tn { background: #f3f4f6; font-weight: bold; color: #374151; }
+
+        /* Summary Stats List */
+        .stat-list { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+        .stat-list li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+        .stat-list li:last-child { border: none; }
+        .stat-label { color: #475569; font-weight: 500; }
+        .stat-value { font-weight: 600; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PfqSim Classifier Assessment</h1>
+        <div class="subtitle">HRFTv13_analyze</div>
+
+        <div class="divider">Dynamic Threshold Report</div>
+
+        <div class="dashboard-grid">
+            <div class="panel">
+                <div class="panel-title">Summary</div>
+                <ul class="stat-list">
+                    <li><span class="stat-label">Expected Positive Pairs</span><span class="stat-value">5000000</span></li>
+                    <li><span class="stat-label">Expected Negative Pairs</span><span class="stat-value">5000000</span></li>
+                    <li><span class="stat-label">Observed Primary Alignments</span><span class="stat-value">5054262</span></li>
+                    <li><span class="stat-label">Total Valid Placements</span><span class="stat-value">9943562</span></li>
+                    <li><span class="stat-label">Total Error Placements</span><span class="stat-value">164962</span></li>
+                </ul>
+
+                <div class="panel-title" style="margin-top:25px;">Dynamic Metrics</div>
+                <ul class="stat-list">
+                    <li><span class="stat-label">Precision (PPV)</span><span id="stat_precision" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Recall - TPR (Sensitivity)</span><span id="stat_recall" class="stat-value">-</span></li>
+                    <li><span class="stat-label">False Positive Rate (FPR)</span><span id="stat_fpr" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Specificity (TNR)</span><span id="stat_specificity" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Accuracy</span><span id="stat_accuracy" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Negative Pred Value (NPV)</span><span id="stat_npv" class="stat-value">-</span></li>
+                    <li><span class="stat-label">Prevalence</span><span id="stat_prevalence" class="stat-value">-</span></li>
+                    <li><span class="stat-label">F1-Score</span><span id="stat_f1" class="stat-value">-</span></li>
+                </ul>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">Dynamic Confusion Matrix</div>
+                <table class="matrix-table">
+                    <tr>
+                        <th colspan="2" rowspan="2"></th>
+                        <th colspan="2">Predicted</th>
+                    </tr>
+                    <tr>
+                        <th>Positive (&ge; Threshold)</th>
+                        <th>Negative (&lt; Threshold)</th>
+                    </tr>
+                    <tr>
+                        <th rowspan="2" style="writing-mode: vertical-lr; transform: rotate(180deg); font-size:10px;">Actual</th>
+                        <td class="matrix-label">Positive</td>
+                        <td class="cell-tp">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">True Positive (TP)</div>
+                            <div id="cell_tp" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-fn">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">False Negative (FN)</div>
+                            <div id="cell_fn" style="font-size:16px;">-</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="matrix-label">Negative</td>
+                        <td class="cell-fp">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">False Positive (FP)</div>
+                            <div id="cell_fp" style="font-size:16px;">-</div>
+                        </td>
+                        <td class="cell-tn">
+                            <div style="font-size:8px; font-weight:normal; margin-bottom:4px;">True Negative (TN)</div>
+                            <div id="cell_tn" style="font-size:16px;">-</div>
+                        </td>
+                    </tr>
+                </table>
+                <p style="font-size:10px; color:#64748b; line-height:1.4; margin-top:15px; margin-bottom: 25px;">
+                    * <strong>False Negatives (FN)</strong> represent simulated expected alignments that were rejected by the threshold filter or dropped entirely as unmapped.
+                </p>
+
+                <div class="panel-title">Threshold Controller</div>
+                <div class="control-group">
+                    <label for="metric_selector">Target Diagnostic Feature</label>
+                    <select id="metric_selector">
+                        <option value="align_score">Alignment Score (AS)</option>
+                        <option value="align_length">Alignment Length (AL)</option>
+                        <option value="as_al">AS / AL (Score per Base)</option>
+                        <option value="align_proportion">Alignment Proportion (AL/RL)</option>
+                        <option value="align_accuracy">Percent Identity (PI)</option>
+                        <option value="mapq">Mapping Quality (MAPQ)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="threshold_slider">Cutoff Threshold (&ge;)</label>
+                    <input type="range" id="threshold_slider">
+                    <div class="slider-meta">
+                        <span id="slider_min">0</span>
+                        <span>Current: <span id="current_threshold_view" class="active-val">0</span></span>
+                        <span id="slider_max">100</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="curves-row">
+            <div id="roc_plot" class="panel" style="height: 450px;"></div>
+            <div id="pr_plot" class="panel" style="height: 450px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const payload = {"report_name":"HRFTv13_analyze","total_expected_positives":5000000,"total_expected_negatives":5000000,"total_observed":5054262,"unmapped_true_negatives":0,"unmapped_false_negatives":0,"true_positives":{"mapq":{"min_val":0.0,"max_val":60.0,"bin_width":1.0,"counts":[545538,76247,16185,4099,4107,3952,5874,4820,4676,4767,7059,5692,6004,5617,7673,6186,5940,5935,7534,6378,6804,5475,9798,5242,5307,5513,5781,4925,4551,4550,4897,4619,4408,4434,5031,4269,4383,4294,4806,4370,4249,4347,4838,4915,4775,5104,5444,5308,23010,5480,6547,8844,5865,7035,8840,10969,7971,9204,20730,10421,8941926]},"align_score":{"min_val":0.0,"max_val":300.0,"bin_width":1.0,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,2,0,3,0,4,0,5,0,81,1,111,0,117,2,140,2,151,0,107,5,139,3,156,3,136,4,128,2,155,2,114,3,164,2,140,1,153,4,136,0,134,4,134,2,123,7,146,3,132,5,133,3,126,5,157,5,156,3,120,5,141,4,121,7,109,3,137,3,118,7,148,6,126,7,147,4,151,8,117,11,119,12,119,6,137,10,155,9,147,8,151,9,128,8,143,8,168,10,154,10,144,10,165,10,179,17,150,17,197,23,169,11,171,17,169,29,176,28,224,24,180,15,181,23,200,24,212,33,234,35,224,22,252,21,274,33,235,31,284,43,265,32,278,30,315,35,332,43,428,61,439,35,434,44,429,56,493,41,1425,94,1287,56,1405,49,1396,94,1443,58,1741,85,1509,101,1619,89,1755,60,1756,115,2191,172,1973,51,2015,146,1969,97,2452,53,2996,401,2294,74,2747,55,2721,261,2918,69,5185,177,3155,110,3655,90,4053,89,4957,106,7908,257,5076,168,5709,73,7659,94,6674,117,16710,504,8824,266,12400,0,11905,0,14244,0,43214,0,21460,0,25841,0,31505,0,22246,0,168059,0,30098,0,85462,0,81877,0,56243,0,877342,0,16490,0,16446,0,16535,0,16593,0,8257452]},"align_length":{"min_val":0.0,"max_val":278.0,"bin_width":1.0,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,61,90,100,119,133,92,119,130,110,116,139,99,135,122,131,128,105,129,97,132,109,120,97,133,124,104,115,102,88,115,97,116,87,111,118,84,83,79,106,110,97,105,85,88,107,84,86,94,87,89,93,89,88,77,96,89,80,87,92,86,90,69,70,96,81,75,81,105,79,98,72,87,80,98,72,1004,1056,1009,1011,1029,1083,1070,1085,1056,1091,1225,1237,1271,1233,1369,1288,1467,1414,1491,1509,1735,1815,1799,2015,2109,2227,2331,2542,2834,2942,3240,3809,4041,4558,5114,5991,7479,8674,10610,12642,16693,22214,29069,38244,56620,81802,4520,4964,4642,1955,9430866,61379,22156,8380,11310,6221,3629,1300,2722,985,2757,736,1504,523,717,1208,725,308,477,234,822,203,273,248,302,281,271,115,163,70,222,84,138,69,92,137,100,33,55,32,113,38,95,32,37,66,26,28,32,46,44,23,21,15,16,35,15,14,17,11,34,14,17,5,14,21,10,6,22,17,10,4,10,4,3,19,4,7,7,3,17,3,1,2,10,6,0,1,1,1,3,3,5,2,4,2,3,1,6,0,3,0,2,0,2,2,0,0,1,0,1,0,1,0,2,1,1,1,1,0,2,0,0,0,0,1,0,2,1]},"as_al":{"min_val":0.0,"max_val":2.0,"bin_width":0.01,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,0,0,2,0,1,2,3,1,3,1,3,3,5,7,3,3,3,6,6,5,3,5,9,15,11,12,17,6,12,11,11,10,17,18,12,14,29,20,18,14,28,23,28,24,26,27,27,38,36,31,39,43,48,55,42,44,38,47,45,58,63,57,59,51,60,49,78,60,71,93,101,89,106,106,110,72,136,118,93,89,117,131,131,99,137,137,161,146,137,165,190,150,186,219,231,164,193,248,248,223,322,293,312,245,314,363,452,297,335,418,392,354,597,632,510,474,610,591,789,505,1025,821,822,462,1037,1268,1481,1073,973,1270,1359,1192,1312,3574,1691,592,2495,1595,2721,1359,6348,2144,2457,1716,4003,4074,12322,1654,5295,7708,4964,2175,10146,35969,9663,8192,20559,13071,3701,5755,153667,6001,89672,799,7437,10349,833320,529,13678,13023,13781,107,15644,8580567]},"align_proportion":{"min_val":0.0,"max_val":1.0,"bin_width":0.01,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,13,40,24,38,13,30,15,35,9,35,30,36,15,21,13,26,15,35,22,33,16,38,17,32,17,41,13,39,28,43,28,51,24,65,31,69,38,93,45,77,39,108,51,120,38,103,61,119,52,147,79,155,71,155,80,170,101,234,129,227,132,267,186,393,198,483,259,561,330,690,375,903,575,1238,693,1813,1167,2665,1403,5095,3382,3177,9914005]},"align_accuracy":{"min_val":0.0,"max_val":1.0,"bin_width":0.01,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9943562]}},"false_positives_control":{"mapq":{"min_val":0.0,"max_val":60.0,"bin_width":1.0,"counts":[14618,47429,24322,6803,8441,4389,3200,2137,1712,1404,1469,1608,1482,1192,1125,1027,892,845,894,800,759,668,638,620,620,604,647,532,545,596,545,503,482,511,445,445,432,416,376,380,401,361,392,432,403,390,389,372,483,447,2565,406,1067,1102,563,923,735,497,623,607,15251]},"align_score":{"min_val":0.0,"max_val":300.0,"bin_width":1.0,"counts":[1,0,0,0,1,0,0,0,3,0,5,0,5,0,5,0,0,0,2,0,3,0,4,1,27,0,4,0,6,0,5,0,4,0,11,0,6,0,11,0,7,0,106,4,445,4,822,5,1607,8,4825,16,6936,19,5443,17,6014,12,6457,10,5181,30,5614,25,5972,17,4908,24,4482,24,4760,17,4184,30,3562,22,3354,29,3197,20,3303,27,2535,17,2424,17,3234,29,2162,24,2190,27,2019,28,2075,16,1958,23,1833,23,1792,21,1716,15,1549,28,1613,19,1516,18,1359,30,1377,18,1304,19,1229,23,1200,20,1238,16,1138,21,1177,18,1124,27,1010,21,1107,12,1006,13,957,16,1005,15,950,13,1061,17,867,9,913,13,920,9,854,7,937,9,864,13,820,8,849,11,761,12,924,8,746,5,747,11,710,13,699,4,873,4,629,5,665,8,625,8,599,9,874,4,568,4,587,3,619,8,530,1,792,2,492,1,534,1,511,3,446,1,788,3,443,1,481,4,448,3,389,2,724,1,375,1,430,3,385,2,317,1,678,2,291,1,430,1,366,0,256,1,679,0,226,1,267,1,290,1,187,0,655,0,182,0,242,1,212,0,180,0,558,0,131,1,178,1,177,0,115,0,598,0,102,0,142,0,145,0,78,0,551,0,63,0,93,0,105,0,61,0,553,0,35,0,46,0,68,0,37,0,505,0,12,0,15,0,14,0,12,0,361]},"align_length":{"min_val":0.0,"max_val":275.0,"bin_width":1.0,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3480,5520,3708,4100,4644,3952,4302,4371,3532,3481,3345,3161,2582,2860,2255,2306,2161,2574,2624,2176,1798,1951,2094,1682,1666,1788,1427,1477,1856,1170,1712,1163,1055,997,1076,885,848,773,829,1334,782,689,691,701,731,658,723,656,707,623,618,638,715,604,619,573,555,573,584,559,729,541,575,502,503,496,547,514,516,499,510,466,497,511,516,473,497,522,482,452,471,445,508,459,489,470,487,524,547,518,523,460,499,474,486,600,482,499,501,439,543,491,513,523,530,548,535,492,492,499,594,549,584,522,538,718,638,632,663,570,933,782,607,483,248,14649,2606,1271,860,581,355,401,181,240,182,161,105,131,71,83,87,61,37,62,42,56,47,24,22,47,19,18,30,28,17,23,15,18,13,9,16,22,8,13,9,8,6,11,6,12,9,4,10,6,6,9,8,3,4,2,4,3,2,3,3,7,1,5,1,1,0,4,4,1,4,1,2,1,1,1,4,1,0,0,1,1,0,1,3,1,1,0,0,1,1,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]},"as_al":{"min_val":0.0,"max_val":2.0,"bin_width":0.01,"counts":[1,0,0,1,0,0,0,3,7,1,3,0,0,3,4,2,3,0,3,1,1,4,3,3,17,3,15,7,4,12,20,17,17,17,14,36,18,24,27,50,41,46,45,55,63,78,73,88,113,78,87,105,126,126,115,165,124,165,158,175,211,210,176,209,237,236,227,368,301,268,270,325,348,396,333,350,408,388,311,404,388,414,353,467,431,490,422,494,554,520,511,1115,576,726,537,620,647,687,575,683,850,704,595,691,748,672,937,829,680,770,669,739,683,953,655,877,646,893,709,822,1152,839,746,915,764,977,745,1324,767,1028,867,849,1394,1388,529,1156,1171,757,1013,981,1343,910,827,1059,1013,1215,798,1471,729,942,891,954,1617,1421,505,871,942,1253,707,961,1153,726,1119,895,994,612,1526,1426,1141,1477,1108,1756,876,1469,1446,829,1271,1179,905,839,1294,687,576,582,511,603,592,1013,363,365,219,196,289,1009,481,317,212,109,24,14,58293]},"align_proportion":{"min_val":0.0,"max_val":1.0,"bin_width":0.01,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8788,3745,8665,3998,8604,3590,6800,3212,5364,2334,4460,2622,4716,1840,4006,1735,3452,1452,3296,1186,2875,1096,2068,903,1620,836,2088,707,1390,743,1381,678,1315,636,1328,616,1177,576,1137,563,1253,574,987,516,1053,530,1004,466,989,516,958,521,932,485,946,469,945,491,1057,507,963,504,941,596,960,502,965,491,1013,532,1058,500,966,593,1115,512,1198,603,1183,480,1556,600,721,23613]},"align_accuracy":{"min_val":0.0,"max_val":1.0,"bin_width":0.01,"counts":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,164962]}},"false_positives_cross":{"mapq":{"min_val":0.0,"max_val":0.0,"bin_width":1.0,"counts":[0]},"align_score":{"min_val":0.0,"max_val":0.0,"bin_width":1.0,"counts":[0]},"align_length":{"min_val":0.0,"max_val":0.0,"bin_width":1.0,"counts":[0]},"as_al":{"min_val":0.0,"max_val":0.0,"bin_width":0.01,"counts":[0]},"align_proportion":{"min_val":0.0,"max_val":0.0,"bin_width":0.01,"counts":[0]},"align_accuracy":{"min_val":0.0,"max_val":0.0,"bin_width":0.01,"counts":[0]}}};
+        const metrics = ['align_score', 'align_length', 'as_al', 'align_proportion', 'align_accuracy', 'mapq'];
+
+        // 1. O(N) Pre-computation: Build Suffix Sums on page load
+        function initHistograms() {
+            for (let key of metrics) {
+                [payload.true_positives[key], payload.false_positives_control[key], payload.false_positives_cross[key]].forEach(hist => {
+                    let total_bins = hist.counts.length;
+                    hist.suffix_sums = new Array(total_bins).fill(0);
+                    
+                    let running = 0;
+                    for (let i = total_bins - 1; i >= 0; i--) {
+                        running += hist.counts[i];
+                        hist.suffix_sums[i] = running;
+                    }
+                });
+            }
+        }
+        initHistograms();
+
+        // 2. O(1) Threshold Lookup
+        function countGreaterOrEqual(histogram, threshold) {
+            let bin_index = Math.round((threshold - histogram.min_val) / histogram.bin_width);
+            
+            if (bin_index < 0) return histogram.suffix_sums[0] || 0;
+            if (bin_index >= histogram.counts.length) return 0;
+            
+            return histogram.suffix_sums[bin_index];
+        }
+
+        // 3. Get bounds directly from Histogram structs
+        function getDynamicConfig(key) {
+            const hist = payload.true_positives[key];
+            return {
+                min: hist.min_val,
+                max: hist.max_val,
+                step: hist.bin_width
+            };
+        }
+
+        // 4. Approximate AUC using trapezoidal rule
+        function calculateAUC(x_arr, y_arr) {
+            let area = 0;
+            for (let i = 1; i < x_arr.length; i++) {
+                let dx = Math.abs(x_arr[i] - x_arr[i - 1]);
+                let dy = (y_arr[i] + y_arr[i - 1]) / 2.0;
+                area += dx * dy;
+            }
+            return area;
+        }
+
+        const metricSelector = document.getElementById('metric_selector');
+        const thresholdSlider = document.getElementById('threshold_slider');
+
+        function updateMetricLayout() {
+            const key = metricSelector.value;
+            const config = getDynamicConfig(key);
+
+            thresholdSlider.min = config.min;
+            thresholdSlider.max = config.max;
+            thresholdSlider.step = config.step;
+            thresholdSlider.value = config.min;
+
+            document.getElementById('slider_min').innerText = config.min.toFixed(config.step % 1 === 0 ? 0 : 2);
+            document.getElementById('slider_max').innerText = config.max.toFixed(config.step % 1 === 0 ? 0 : 2);
+
+            generateStaticPlots(key, config);
+            recalculateMetrics();
+        }
+
+        function generateStaticPlots(key, config) {
+            const steps = 100;
+            let roc_x = [], roc_y = [];
+            let pr_x = [], pr_y = [];
+
+            let total_sim_positives = payload.total_expected_positives * 2; 
+            let total_sim_negatives = payload.total_expected_negatives * 2;
+            let total_negatives_pool = total_sim_negatives + countGreaterOrEqual(payload.false_positives_cross[key], config.min); // Using counts for baseline
+
+            for(let i = 0; i <= steps; i++) {
+                let t = config.min + ((config.max - config.min) * (i / steps));
+                let tp = countGreaterOrEqual(payload.true_positives[key], t);
+                let fp_control = countGreaterOrEqual(payload.false_positives_control[key], t);
+                let fp_cross = countGreaterOrEqual(payload.false_positives_cross[key], t);
+                let fp = fp_control + fp_cross;
+                let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
+                let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
+                let precision = (tp + fp) > 0 ? (tp / (tp + fp)) : 1.0;
+
+                roc_x.push(fpr);
+                roc_y.push(tpr);
+                
+                pr_x.push(tpr); 
+                pr_y.push(precision);
+            }
+
+            // Enforce ROC anchors
+            if (roc_x[0] < 1.0 || roc_y[0] < 1.0) {
+                roc_x.unshift(1.0);
+                roc_y.unshift(1.0);
+            }
+            if (roc_x[roc_x.length - 1] > 0.0 || roc_y[roc_y.length - 1] > 0.0) {
+                roc_x.push(0.0);
+                roc_y.push(0.0);
+            }
+
+            // Enforce PR anchor
+            if (pr_x[pr_x.length - 1] > 0.0) {
+                pr_x.push(0.0);
+                pr_y.push(1.0); 
+            }
+
+            const roc_auc = calculateAUC(roc_x, roc_y);
+            const pr_auc = calculateAUC(pr_x, pr_y);
+
+            const rocTrace = { x: roc_x, y: roc_y, type: 'scatter', mode: 'lines', name: 'ROC Curve', line: { color: '#2563eb', width: 2.5 } };
+            const rocBaseline = { x: [0, 1], y: [0, 1], type: 'scatter', mode: 'lines', name: 'Random Guess', line: { color: '#94a3b8', dash: 'dash' } };
+            const rocCurrent = { x: [0], y: [0], type: 'scatter', mode: 'markers', name: 'Current Cutoff', marker: { color: 'red', size: 10, symbol: 'cross' } };
+
+            const prTrace = { x: pr_x, y: pr_y, type: 'scatter', mode: 'lines', name: 'PR Curve', line: { color: '#16a34a', width: 2.5 } };
+            const prCurrent = { x: [0], y: [0], type: 'scatter', mode: 'markers', name: 'Current Cutoff', marker: { color: 'red', size: 10, symbol: 'cross' } };
+
+            Plotly.newPlot('roc_plot', [rocTrace, rocBaseline, rocCurrent], {
+                title: 'Receiver Operating Characteristic (ROC)<br><span style="font-size:14px;color:#64748b;">AUC: ' + roc_auc.toFixed(4) + '</span>',
+                xaxis: { title: 'False Positive Rate (FPR)', range: [-0.02, 1.02] },
+                yaxis: { title: 'True Positive Rate (TPR)', range: [-0.02, 1.02] },
+                margin: { t:60, b:50, l:50, r:20 },
+                showlegend: false
+            }, { displaylogo: false });
+
+            Plotly.newPlot('pr_plot', [prTrace, prCurrent], {
+                title: 'Precision-Recall Curve (PR)<br><span style="font-size:14px;color:#64748b;">AUC: ' + pr_auc.toFixed(4) + '</span>',
+                xaxis: { title: 'Recall (TPR)', range: [-0.02, 1.02] },
+                yaxis: { title: 'Precision (PPV)', range: [-0.02, 1.02] },
+                margin: { t:60, b:50, l:50, r:20 },
+                showlegend: false
+            }, { displaylogo: false });
+        }
+
+        function recalculateMetrics() {
+            const key = metricSelector.value;
+            const config = getDynamicConfig(key);
+            const threshold = parseFloat(thresholdSlider.value);
+
+            document.getElementById('current_threshold_view').innerText = threshold.toFixed(config.step % 1 === 0 ? 0 : 2);
+
+            let tp = countGreaterOrEqual(payload.true_positives[key], threshold);
+            let fp_control = countGreaterOrEqual(payload.false_positives_control[key], threshold);
+            let fp_cross = countGreaterOrEqual(payload.false_positives_cross[key], threshold);
+            
+            let fp = fp_control + fp_cross;
+            
+            let total_sim_positives = payload.total_expected_positives * 2;
+            let total_sim_negatives = payload.total_expected_negatives * 2;
+            let total_negatives_pool = total_sim_negatives + countGreaterOrEqual(payload.false_positives_cross[key], config.min);
+
+            let fn = total_sim_positives - tp;
+            let tn = total_negatives_pool - fp; // Safely calculated relative to the unified error pool
+
+            let tpr = total_sim_positives > 0 ? (tp / total_sim_positives) : 0;
+            let fpr = total_negatives_pool > 0 ? (fp / total_negatives_pool) : 0;
+            let precision = (tp + fp) > 0 ? (tp / (tp + fp)) : 1.0;
+            let f1 = (precision + tpr) > 0 ? (2 * (precision * tpr) / (precision + tpr)) : 0;
+            
+            let specificity = total_negatives_pool > 0 ? (tn / total_negatives_pool) : 0;
+            let accuracy = (total_sim_positives + total_negatives_pool) > 0 ? ((tp + tn) / (total_sim_positives + total_negatives_pool)) : 0;
+            let npv = (tn + fn) > 0 ? (tn / (tn + fn)) : 1.0;
+            let prevalence = (total_sim_positives + total_negatives_pool) > 0 ? (total_sim_positives / (total_sim_positives + total_negatives_pool)) : 0;
+
+            document.getElementById('cell_tp').innerText = tp.toLocaleString();
+            document.getElementById('cell_fp').innerText = fp.toLocaleString();
+            document.getElementById('cell_fn').innerText = fn.toLocaleString();
+            document.getElementById('cell_tn').innerText = tn.toLocaleString();
+
+            document.getElementById('stat_precision').innerText = (precision * 100).toFixed(2) + '%';
+            document.getElementById('stat_recall').innerText = (tpr * 100).toFixed(2) + '%';
+            document.getElementById('stat_fpr').innerText = (fpr * 100).toFixed(2) + '%';
+            document.getElementById('stat_f1').innerText = f1.toFixed(4);
+            
+            document.getElementById('stat_specificity').innerText = (specificity * 100).toFixed(2) + '%';
+            document.getElementById('stat_accuracy').innerText = (accuracy * 100).toFixed(2) + '%';
+            document.getElementById('stat_npv').innerText = (npv * 100).toFixed(2) + '%';
+            document.getElementById('stat_prevalence').innerText = (prevalence * 100).toFixed(2) + '%';
+
+            Plotly.animate('roc_plot', {
+                data: [{}, {}, { x: [fpr], y: [tpr] }],
+                traces: [0, 1, 2]
+            }, { transition: { duration: 0 }, frame: { duration: 0, redraw: false } });
+
+            Plotly.animate('pr_plot', {
+                data: [{}, { x: [tpr], y: [precision] }],
+                traces: [0, 1]
+            }, { transition: { duration: 0 }, frame: { duration: 0, redraw: false } });
+        }
+
+        metricSelector.addEventListener('change', updateMetricLayout);
+        thresholdSlider.addEventListener('input', recalculateMetrics);
+
+        // Bootstrap application setup
+        updateMetricLayout();
+    </script>
+</body>
+</html>
