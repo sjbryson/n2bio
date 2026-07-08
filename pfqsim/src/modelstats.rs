@@ -1,7 +1,7 @@
 //! n2bio/pfqsim/src/hist.rs
 //! Payload structures for empirical sequencing data modeling.
 
-use serde::{Serialize, Deserialize};
+use serde::{ Serialize, Deserialize };
 
 use n2core::hist::Histogram;
 

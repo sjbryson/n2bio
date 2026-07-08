@@ -1,7 +1,7 @@
 //! n2bio/n2core/src/bam.rs
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{self, Read, ErrorKind};
+use byteorder::{ LittleEndian, ReadBytesExt };
+use std::io::{ self, Read, ErrorKind };
 use flate2::read::MultiGzDecoder;
 use crate::readers::ReaderType;
 

@@ -1,7 +1,7 @@
 //! n2bio/n2core/src/hist.rs
 //! Core histogram structures for empirical distribution accumulation, stats calcs, and sampling.
 
-use serde::{Serialize, Deserialize};
+use serde::{ Serialize, Deserialize };
 
 
 // ============================================================================

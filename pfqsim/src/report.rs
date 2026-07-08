@@ -1,10 +1,10 @@
 //! n2bio/pfqsim/src/report.rs
 //! 
 
-use std::fs::{self, File};
+use std::fs::{ self, File };
 use std::path::PathBuf;
 use std::io;
-use serde::{Serialize, Deserialize};
+use serde::{ Serialize, Deserialize };
 
 use n2core::hist::Histogram;
 

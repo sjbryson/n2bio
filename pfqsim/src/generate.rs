@@ -1,9 +1,9 @@
 //! n2bio/pfqsim/src/generate.rs
 //! 
 
-use std::io::{self, Error, ErrorKind};
+use std::io::{ self, Error, ErrorKind };
 use std::thread;
-use std::fs::{File, OpenOptions};
+use std::fs::{ File, OpenOptions };
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use rand::rngs::SmallRng;
@@ -14,13 +14,13 @@ use std::path::PathBuf;
 use n2core::fasta::FastaReader;
 use n2core::readers::ReaderType;
 use n2core::writers::WriterType;
-use n2core::fastq::{FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWriter };
+use n2core::fastq::{ FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWriter };
 use n2core::sequence::DnaSequence; 
 
 use crate::cli::GenerateArgs;
 use crate::modelstats::ModelStats;
 use crate::genome::ReferenceGenome;
-use crate::mutate::{Mutator, MutationStats};
+use crate::mutate::{ Mutator, MutationStats };
 
 // ============================================================================
 // Main Runner

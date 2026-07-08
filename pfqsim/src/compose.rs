@@ -5,7 +5,7 @@ use std::io;
 use std::fs;
 use std::time::Instant;
 
-use crate::cli::{ComposeArgs, GenerateArgs};
+use crate::cli::{ ComposeArgs, GenerateArgs };
 use crate::config::ComposeConfig;
 use crate::generate;
 
