@@ -1,5 +1,5 @@
 //! n2bio/n2core/src/hist.rs
-//! Core histogram structures for empirical distribution accumulation and sampling.
+//! Core histogram structures for empirical distribution accumulation, stats calcs, and sampling.
 
 use serde::{Serialize, Deserialize};
 
@@ -101,7 +101,7 @@ impl Histogram {
 
     /// Calculates the weighted mean of the binned data.
     pub fn mean(&self) -> Option<f64> {
-        let total = self.total_count();
+        let total: usize = self.total_count();
         if total == 0 { return None; }
 
         let weighted_sum: f64 = self.counts.iter().enumerate()
@@ -118,20 +118,20 @@ impl Histogram {
         let total = self.total_count();
         if total == 0 { return None; }
 
-        let target_rank = (p / 100.0) * total as f64;
-        let mut cumulative_count = 0.0;
+        let target_rank: f64 = (p / 100.0) * total as f64;
+        let mut cumulative_count: f64 = 0.0;
 
         for (i, &count) in self.counts.iter().enumerate() {
-            let prev_cumulative = cumulative_count;
+            let prev_cumulative: f64 = cumulative_count;
             cumulative_count += count as f64;
 
             if cumulative_count >= target_rank {
                 // Determine the starting physical value of this bin
-                let bin_low_bound = self.min_val + (i as f64) * self.bin_width;
+                let bin_low_bound: f64 = self.min_val + (i as f64) * self.bin_width;
                 if count == 0 { return Some(bin_low_bound); }
 
                 // Linear interpolation: trace exactly where the rank falls inside the bin
-                let fraction = (target_rank - prev_cumulative) / count as f64;
+                let fraction: f64 = (target_rank - prev_cumulative) / count as f64;
                 return Some(bin_low_bound + (fraction * self.bin_width));
             }
         }
@@ -189,7 +189,7 @@ impl Histogram {
         Some(self.bin_midpoint(max_idx))
     }
 
-    /// Returns the true bounding range of actual observations (ignores empty padding bins).
+    /// Returns the bounding range of observations (ignores empty padding bins).
     /// Returns: Option<(ObservedMin, ObservedMax)>
     pub fn observed_range(&self) -> Option<(f64, f64)> {
         let first_populated_idx: usize = self.counts.iter().position(|&c| c > 0)?;
