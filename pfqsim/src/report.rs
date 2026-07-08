@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::io;
 use serde::{Serialize, Deserialize};
 
-use crate::hist::Histogram;
+use n2core::hist::Histogram;
 
 // ============================================================================
 // Report data

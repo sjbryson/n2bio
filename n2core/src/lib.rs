@@ -11,3 +11,4 @@ pub mod sequence;
 pub mod kmer;
 pub mod alignmentgraph;
 pub mod align;
+pub mod hist;

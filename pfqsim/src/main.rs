@@ -6,7 +6,6 @@ mod model;
 mod generate;
 mod compose;
 mod analyze;
-mod hist;
 mod modelstats;
 mod genome;
 mod mutate;
