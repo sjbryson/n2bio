@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::io;
 use serde::{Serialize, Deserialize};
 
-use crate::hist::{ HistType, Histogram };
+use crate::hist::Histogram;
 
 // ============================================================================
 // Report data
@@ -61,12 +61,12 @@ impl MetricPayload {
     /// Adjust max limits (like align_score 1000) if you are working with long reads!
     pub(crate) fn new() -> Self {
         Self {
-            mapq: Histogram::new(HistType::Integer { min: 0.0, max: 60.0 }),
-            align_score: Histogram::new(HistType::Integer { min: 0.0, max: 1000.0 }),
-            align_length: Histogram::new(HistType::Integer { min: 0.0, max: 1000.0 }),
-            as_al: Histogram::new(HistType::Float { min: 0.0, max: 2.0, bin_width: 0.01 }),
-            align_proportion: Histogram::new(HistType::Float { min: 0.0, max: 1.0, bin_width: 0.01 }),
-            align_accuracy: Histogram::new(HistType::Float { min: 0.0, max: 1.0, bin_width: 0.01 }),
+            mapq: Histogram::new(0.0, 60.0, 1.0),
+            align_score: Histogram::new(0.0, 1000.0, 1.0),
+            align_length: Histogram::new(0.0, 1000.0, 1.0),
+            as_al: Histogram::new(0.0, 1000.0, 0.1),
+            align_proportion: Histogram::new(0.0, 1.0, 0.01),
+            align_accuracy: Histogram::new(0.0, 1.0, 0.01),
         }
     }
 

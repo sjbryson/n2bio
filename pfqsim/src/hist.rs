@@ -8,12 +8,6 @@ use serde::{Serialize, Deserialize};
 // Histogram
 // ============================================================================
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum HistType {
-    Integer { min: f64, max: f64 },
-    Float { min: f64, max: f64, bin_width: f64 },
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct Histogram {
     pub(crate) min_val: f64,
@@ -26,14 +20,17 @@ pub(crate) struct Histogram {
 }
 
 impl Histogram {
-    /// Initializes a new histogram with boundaries appropriate for the data type.
-    pub(crate) fn new(hist_type: HistType) -> Self {
-        let (min_val, max_val, bin_width) = match hist_type {
-            HistType::Integer { min, max } => (min, max, 1.0),
-            HistType::Float { min, max, bin_width } => (min, max, bin_width),
-        };
+    /// Initializes a new histogram with specified boundaries and bin width.
+    pub(crate) fn new(min_val: f64, max_val: f64, bin_width: f64) -> Self {
         let num_bins: usize = ((max_val - min_val) / bin_width).ceil() as usize + 1;
-        Self { min_val, max_val, bin_width, counts: vec![0; num_bins], cdf: Vec::new(), }
+        
+        Self { 
+            min_val, 
+            max_val, 
+            bin_width, 
+            counts: vec![0; num_bins],
+            cdf: Vec::new(),
+        }
     }
 
     /// Increments the bin corresponding to the provided value. 
@@ -86,10 +83,10 @@ impl Histogram {
     /// `p` should be a uniformly distributed random float in the range [0.0, 1.0].
     pub(crate) fn sample(&self, p: f64) -> f64 {
         if self.cdf.is_empty() {
-            return self.min_val; // Safe fallback if sampling an empty/uncompiled distribution
+            return self.min_val; // Safe fallback if sampling an empty distribution
         }
         
-        // O(log N) binary search to find the first index where CDF >= p
+        // Find the first index where CDF >= p
         let idx: usize = self.cdf.partition_point(|&prob| prob < p);
         let safe_idx: usize = idx.min(self.counts.len().saturating_sub(1));
         

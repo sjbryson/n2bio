@@ -6,7 +6,7 @@ use std::fs;
 use std::time::Instant;
 
 use crate::cli::{ComposeArgs, GenerateArgs};
-use crate::config::{ComposeConfig, Manifest};
+use crate::config::ComposeConfig;
 use crate::generate;
 
 pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
@@ -17,11 +17,11 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     config.validate_and_compute_lengths()?;
     
     // 2. Compute the community read distributions
-    let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
-
+    //let manifest: Manifest = Manifest::from_config(&config, args.total_reads, args.abundance_mode);
+    config.compute_distributions(args.total_reads, args.abundance_mode);
     // 3. Save the runtime manifest
     let manifest_path: String = format!("{}.manifest.tsv", args.prefix);
-    manifest.save_tsv(&manifest_path)?;
+    config.save_tsv(&manifest_path)?;
     println!("Library manifest written to: {}", manifest_path);
 
     // 4. Overwrite behavior - delete pre-existing r1 and r2 fastq
@@ -31,8 +31,8 @@ pub(crate) fn run(args: ComposeArgs) -> io::Result<()> {
     fs::remove_file(&global_r1).ok();
     fs::remove_file(&global_r2).ok();
 
-    // 5. Execute the manifest actions sequentially, appending sim reads to the global files
-    for row in &manifest.rows {
+    // 5. Execute the ConfigTasks actions sequentially, appending sim reads to the global files
+    for row in &config.rows {
         println!("Simulating {} reads for genome: {}", row.calculated_reads, row.id);
         
         if row.calculated_reads == 0 { 

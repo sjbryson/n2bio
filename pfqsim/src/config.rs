@@ -13,7 +13,7 @@ use crate::cli::AbundanceMode;
 use crate::genome::ReferenceGenome;
 
 // ============================================================================
-// Configuration (Inputs)
+// Compose Config
 // ============================================================================
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -30,6 +30,9 @@ pub(crate) struct ComposeTask {
     
     #[serde(skip_deserializing, default)]
     pub(crate) genome_length: usize,
+
+    #[serde(skip_deserializing, default)]
+    pub(crate) calculated_reads: usize,
 }
 
 /// Case-insensitive parsing for config boolean declarations 
@@ -38,9 +41,7 @@ fn deserialize_flexible_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: Deserializer<'de>,
 {
-    // Extract the raw field content as a temporary string
-    let s: String = Deserialize::deserialize(deserializer)?;
-    
+    let s: String = Deserialize::deserialize(deserializer)?;   
     match s.trim().to_uppercase().as_str() {
         "TRUE" | "T" | "YES" | "Y" | "1" => Ok(true),
         "FALSE" | "F" | "NO" | "N" | "0" => Ok(false),
@@ -74,117 +75,70 @@ impl ComposeConfig {
 
     /// Validates all genomes, calculates lengths, and checks circularity constraints.
     pub(crate) fn validate_and_compute_lengths(&mut self) -> io::Result<()> {
-        for row in &mut self.rows {
+        for task in &mut self.rows {
             // Call out to the domain model function to calculate metrics
-            let (clean_length, contig_count) = ReferenceGenome::parse_fasta_metrics(&row.fasta)?;
+            let (clean_length, contig_count) = ReferenceGenome::parse_fasta_metrics(&task.fasta)?;
 
             if clean_length == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Validation Error [{}] -> FASTA file contains 0 valid non-N bases.", row.id),
+                    format!("Validation Error [{}] -> FASTA file contains 0 valid non-N bases.", task.id),
                 ));
             }
 
-            if contig_count > 1 && row.circular {
+            if contig_count > 1 && task.circular {
                 println!(
                     "[Validation Warning] Genome '{}' contains multiple contigs ({}) but was marked as circular. \
                      Circularity is only valid for single-contig chromosomes. Forcing circular = false.",
-                    row.id, contig_count
+                    task.id, contig_count
                 );
-                row.circular = false;
+                task.circular = false;
             }
 
-            row.genome_length = clean_length;
+            task.genome_length = clean_length;
         }
         
         Ok(())
     }
 
-}
 
-// ============================================================================
-// Manifest (Output)
-// ============================================================================
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct ManifestRow {
-    // Fields preserved from the configuration
-    pub(crate) id: String,
-    pub(crate) keyword: String,
-    pub(crate) abundance: f64,
-    pub(crate) fasta: String,
-    pub(crate) genome_length: usize,
-    pub(crate) circular: bool,
-    pub(crate) sub_rate: f64,
-    pub(crate) indel_rate: f64,
-    // The calculated read allocation
-    pub(crate) calculated_reads: usize,
-}
-
-impl ManifestRow {
-    /// Upgrades a raw config row into a manifest plan row by appending the read count
-    pub(crate) fn from_config_row(row: ComposeTask, calculated_reads: usize) -> Self {
-        Self {
-            id: row.id,
-            keyword: row.keyword,
-            abundance: row.abundance,
-            fasta: row.fasta,
-            genome_length: row.genome_length,
-            circular: row.circular,
-            sub_rate: row.sub_rate,
-            indel_rate: row.indel_rate,
-            calculated_reads,
-        }
-    }
-}
-
-pub(crate) struct Manifest {
-    pub rows: Vec<ManifestRow>,
-}
-
-impl Manifest {
     /// Generates a concrete execution manifest from a configuration map
-    pub(crate) fn from_config(config: &ComposeConfig, total_reads: usize, mode: AbundanceMode) -> Self {
-        let mut manifest_rows: Vec<ManifestRow> = Vec::with_capacity(config.rows.len());
-        if config.rows.is_empty() {
-            return Self { rows: manifest_rows };
+    pub(crate) fn compute_distributions(&mut self, total_reads: usize, mode: AbundanceMode) {
+        if self.rows.is_empty() {
+            return;
         }
 
         match mode {
             AbundanceMode::ReadFraction => {
-                let total_weight: f64 = config.rows.iter().map(|r| r.abundance).sum();
+                let total_weight: f64 = self.rows.iter().map(|t| t.abundance).sum();
                 
-                for row in &config.rows {
-                    let reads: usize = if total_weight > 0.0 {
-                        ((row.abundance / total_weight) * total_reads as f64).round() as usize
+                for task in &mut self.rows {
+                    task.calculated_reads = if total_weight > 0.0 {
+                        ((task.abundance / total_weight) * total_reads as f64).round() as usize
                     } else {
                         0
                     };
-                    manifest_rows.push(ManifestRow::from_config_row(row.clone(), reads));
                 }
             }
             AbundanceMode::CopyFraction => {
-                // Read allocation is strictly proportional to (copy_abundance * genome_length)
-                let weights: Vec<f64> = config.rows.iter()
-                    .map(|r| r.abundance * r.genome_length as f64)
+                // Read allocation is strictly proportional to (abundance * genome_length)
+                let weights: Vec<f64> = self.rows.iter()
+                    .map(|t| t.abundance * t.genome_length as f64)
                     .collect();
                 let total_weight: f64 = weights.iter().sum();
                 
-                for (i, row) in config.rows.iter().enumerate() {
-                    let reads: usize = if total_weight > 0.0 {
+                for (i, task) in self.rows.iter_mut().enumerate() {
+                    task.calculated_reads = if total_weight > 0.0 {
                         ((weights[i] / total_weight) * total_reads as f64).round() as usize
                     } else {
                         0
                     };
-                    manifest_rows.push(ManifestRow::from_config_row(row.clone(), reads));
                 }
             }
         }
-
-        Self { rows: manifest_rows }
     }
 
-    /// Helper to write the manifest to tsv
+     /// Helper to write the config to tsv
     pub(crate) fn save_tsv<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         let mut wtr: csv::Writer<File> = csv::WriterBuilder::new()
             .delimiter(b'\t')

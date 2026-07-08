@@ -3,7 +3,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::hist::{Histogram, HistType};
+use crate::hist::Histogram;
 
 // ============================================================================
 // ModelStats
@@ -24,22 +24,20 @@ impl ModelStats {
     /// `max_insert_size` bounds the max observable insert size (e.g., 2000.0).
     /// `max_read_length` bounds the length histograms and determines the number of quality histograms.
     pub(crate) fn new(max_read_length: usize, max_insert_size: f64) -> Self {
-        let length_hist_type: HistType = HistType::Integer { min: 0.0, max: max_read_length as f64 };
-        let quality_hist_type: HistType = HistType::Integer { min: 0.0, max: 60.0 }; // Standard max Phred score
-        
+                
         let mut r1_quals: Vec<Histogram> = Vec::with_capacity(max_read_length);
         let mut r2_quals: Vec<Histogram> = Vec::with_capacity(max_read_length);
         
         for _ in 0..max_read_length {
-            r1_quals.push(Histogram::new(quality_hist_type));
-            r2_quals.push(Histogram::new(quality_hist_type));
+            r1_quals.push(Histogram::new(0.0, 60.0, 1.0));
+            r2_quals.push(Histogram::new(0.0, 60.0, 1.0));
         }
 
         Self {
             max_read_length,
-            insert_sizes: Histogram::new(HistType::Integer { min: 0.0, max: max_insert_size }),
-            r1_lengths: Histogram::new(length_hist_type),
-            r2_lengths: Histogram::new(length_hist_type),
+            insert_sizes: Histogram::new(0.0,  max_insert_size, 1.0),
+            r1_lengths:   Histogram::new(0.0, max_read_length as f64, 1.0),
+            r2_lengths:   Histogram::new(0.0, max_read_length as f64, 1.0),
             r1_qualities: r1_quals,
             r2_qualities: r2_quals,
         }
