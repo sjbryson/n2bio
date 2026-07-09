@@ -153,7 +153,7 @@ impl ComposeConfig {
 }
 
 // ============================================================================
-// Analyze config - based on Manifest - includes "target" field
+// Analyze config - reads manifest.tsv output from pfqsim analyze
 // ============================================================================
 
 #[derive(Deserialize, Debug, Clone)]
@@ -183,4 +183,32 @@ impl AnalyzeConfig {
     }
 }
 
+// ============================================================================
+// Analyze config - reads manifest.tsv output from pfqsim analyze
+// ============================================================================
 
+#[derive(Deserialize, Debug, Clone)]
+pub(crate) struct CompareRow {
+    pub(crate) id: String,      // Identifier for an analysis report - used as plot labels
+    pub(crate) report: String, // Path to the analysis json report associated with the id
+}
+
+pub(crate) struct CompareConfig {
+    pub(crate) rows: Vec<CompareRow>,
+}
+
+impl CompareConfig {
+    pub(crate) fn from_tsv<P: AsRef<std::path::Path>>(path: P) -> io::Result<Self> {
+        let file: File = File::open(path)?;
+        let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_reader(file);
+
+        let mut rows: Vec<CompareRow> = Vec::new();
+        for result in rdr.deserialize() {
+            let row: CompareRow = result.map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+            rows.push(row);
+        }
+        Ok(Self { rows })
+    }
+}

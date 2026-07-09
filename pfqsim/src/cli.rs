@@ -3,6 +3,10 @@
 
 use clap::{ Args, Parser, Subcommand };
 
+// ============================================================================
+// Subcommands
+// ============================================================================
+
 #[derive(Parser)]
 #[command(name = "pfqsim", version = "1.0", about = "Fast metagenomic read simulator")]
 pub(crate) struct Cli {
@@ -20,7 +24,13 @@ pub(crate) enum Commands {
     Compose(ComposeArgs),
     /// Analyze alignments from a name sorted BAM file for classification stats
     Analyze(AnalyzeArgs),
+    /// Compare alignment performance for a set of pfqsim analyze reports
+    Compare(CompareArgs),
 }
+
+// ============================================================================
+// Model Args
+// ============================================================================
 
 #[derive(Args)]
 pub(crate) struct ModelArgs {
@@ -45,6 +55,10 @@ pub(crate) struct ModelArgs {
     #[arg(short = 'i', long, default_value_t = 1000)]
     pub max_ins: usize,
 }
+
+// ============================================================================
+// Generate Args
+// ============================================================================
 
 #[derive(Args)]
 pub(crate) struct GenerateArgs {
@@ -103,17 +117,9 @@ pub(crate) struct GenerateArgs {
 
 }
 
-
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub(crate) enum AbundanceMode {
-    /// Calculate abundance as fraction of total reads
-    #[value(name = "reads")]
-    ReadFraction,
-    
-    /// Calculate abundance as fraction of total genome copies
-    #[value(name = "copies")]
-    CopyFraction,
-}
+// ============================================================================
+// Compose Args
+// ============================================================================
 
 #[derive(Args)]
 pub(crate) struct ComposeArgs {
@@ -151,6 +157,21 @@ pub(crate) struct ComposeArgs {
     pub abundance_mode: AbundanceMode,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub(crate) enum AbundanceMode {
+    /// Calculate abundance as fraction of total reads
+    #[value(name = "reads")]
+    ReadFraction,
+    
+    /// Calculate abundance as fraction of total genome copies
+    #[value(name = "copies")]
+    CopyFraction,
+}
+
+// ============================================================================
+// Analyze Args
+// ============================================================================
+
 #[derive(Parser, Debug, Clone)]
 pub(crate) struct AnalyzeArgs {
     
@@ -167,7 +188,7 @@ pub(crate) struct AnalyzeArgs {
     pub reference_map: String,
 
     /// Output path prefix for the generated HTML & json evaluation reports
-    #[arg(short = 'o', long, default_value = "pfqsim_report")]
+    #[arg(short = 'o', long, default_value = "pfqsim_analyze_report")]
     pub output: String,
 
     /// Part of read identifier to use for reference sequence mapping
@@ -190,4 +211,20 @@ pub(crate) enum MappingMode {
     /// Reference database mapping: Accession --> ReadAccession
     #[value(name = "accession")]
     ReadAccession,
+}
+
+// ============================================================================
+// Compare Args
+// ============================================================================
+
+#[derive(Parser, Debug, Clone)]
+pub(crate) struct CompareArgs {
+    
+    /// Path to a TSV config file 
+    #[arg(short = 'c', long)]
+    pub config: String,
+
+    /// Output path prefix for the generated HTML & json evaluation reports
+    #[arg(short = 'o', long, default_value = "pfqsim_analyze_report")]
+    pub output: String,
 }

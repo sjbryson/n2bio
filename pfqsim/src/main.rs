@@ -6,11 +6,12 @@ mod model;
 mod generate;
 mod compose;
 mod analyze;
+mod compare;
 mod modelstats;
 mod genome;
 mod mutate;
 mod config;
-mod report;
+mod analyze_report;
 
 use std::io;
 use clap::Parser;
@@ -27,6 +28,7 @@ fn main() -> io::Result<()> {
         Commands::Generate(gen_args)    => generate::run(gen_args)?,
         Commands::Compose(comp_args)    => compose::run(comp_args)?,
         Commands::Analyze(analyze_args) => analyze::run(analyze_args)?,
+        Commands::Compare(compare_args) => compare::run(compare_args)?, //// FIX to new compose::run()
     }
 
     Ok(())

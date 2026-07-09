@@ -10,8 +10,8 @@ use serde::{ Serialize, Deserialize };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Histogram {
-    pub(crate) min_val: f64,
-    pub(crate) max_val: f64,
+    pub min_val: f64,
+    pub max_val: f64,
     pub bin_width: f64,
     pub counts: Vec<usize>,
     // Excluded from JSON payload; built in-memory when loaded for sampling

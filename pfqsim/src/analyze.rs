@@ -11,7 +11,7 @@ use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
 
 use crate::config::AnalyzeConfig;
 use crate::cli::{ AnalyzeArgs, MappingMode };
-use crate::report::{ AnalyzeReportData, MetricPayload, generate_evaluation_reports };
+use crate::analyze_report::{ AnalyzeReportData, MetricPayload, generate_evaluation_reports };
 
     
 pub(crate) fn run(args: AnalyzeArgs) -> io::Result<()> {
