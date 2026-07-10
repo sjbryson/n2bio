@@ -26,6 +26,7 @@ pub(crate) fn run(args: CompareArgs) -> io::Result<()> {
     let mut payloads: Vec<ComparePayload> = Vec::with_capacity(config.rows.len());
 
     for row in config.rows {
+        
         let file: File = File::open(&row.report)?;
         let report: AnalyzeReportData = serde_json::from_reader(file)?; // Uses your struct!
 

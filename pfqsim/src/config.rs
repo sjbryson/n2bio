@@ -1,8 +1,6 @@
 //! n2bio/pfqsim/src/config.rs
 //! 
 
-#![allow(unused)]
-
 use std::fs::File;
 use std::io::{self, Error, ErrorKind};
 use std::path::Path;
@@ -156,9 +154,9 @@ impl ComposeConfig {
 // Analyze config - reads manifest.tsv output from pfqsim analyze
 // ============================================================================
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize)]
 pub(crate) struct AnalyzeRow {
-    pub(crate) id: String,      // E.g., "GRCh38" -> matches read header `@{id}:...`
+    //pub(crate) id: String,      // E.g., "GRCh38" -> matches read header `@{id}:...`
     pub(crate) keyword: String, // Keyword used in generating reads @id:keyword:accession:read_number
     pub(crate) calculated_reads: usize,    // The calculated read allocation from compose step
 }
