@@ -381,7 +381,7 @@ pub(crate) fn generate_evaluation_reports(
             const prCurrent = {{ x: [0], y: [0], type: 'scatter', mode: 'markers', name: 'Current Cutoff', marker: {{ color: 'red', size: 10, symbol: 'cross' }} }};
 
             Plotly.newPlot('roc_plot', [rocTrace, rocBaseline, rocCurrent], {{
-                title: 'Receiver Operating Characteristic (ROC)<br><span style="font-size:14px;color:#64748b;">AUC: ' + roc_auc.toFixed(4) + '</span>',
+                title: 'Receiver Operating Characteristic (ROC)<br><span style="font-size:12px;color:#64748b;">AUC: ' + roc_auc.toFixed(4) + '</span>',
                 xaxis: {{ title: 'False Positive Rate (FPR)', range: [-0.02, 1.02] }},
                 yaxis: {{ title: 'True Positive Rate (TPR)', range: [-0.02, 1.02] }},
                 margin: {{ t:60, b:50, l:50, r:20 }},
@@ -389,7 +389,7 @@ pub(crate) fn generate_evaluation_reports(
             }}, {{ displaylogo: false }});
 
             Plotly.newPlot('pr_plot', [prTrace, prCurrent], {{
-                title: 'Precision-Recall Curve (PR)<br><span style="font-size:14px;color:#64748b;">AUC: ' + pr_auc.toFixed(4) + '</span>',
+                title: 'Precision-Recall Curve (PR)<br><span style="font-size:12px;color:#64748b;">AUC: ' + pr_auc.toFixed(4) + '</span>',
                 xaxis: {{ title: 'Recall (TPR)', range: [-0.02, 1.02] }},
                 yaxis: {{ title: 'Precision (PPV)', range: [-0.02, 1.02] }},
                 margin: {{ t:60, b:50, l:50, r:20 }},

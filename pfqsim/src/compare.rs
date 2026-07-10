@@ -92,15 +92,14 @@ fn compute_curves(
     total_n: usize,
 ) -> CurveData {
     // 1. Map values to a unified grid to handle trimmed histograms seamlessly
-    // Grid Key: Integer bin index, Value: (TP_count, FP_count)
     let mut grid: BTreeMap<i64, (usize, usize)> = BTreeMap::new();
 
     let mut insert_hist = |hist: &Histogram, is_tp: bool| {
         for (i, &count) in hist.counts.iter().enumerate() {
             if count > 0 {
-                let val = hist.min_val + (i as f64) * hist.bin_width;
-                let grid_idx = (val / hist.bin_width).round() as i64;
-                let entry = grid.entry(grid_idx).or_insert((0, 0));
+                let val: f64 = hist.min_val + (i as f64) * hist.bin_width;
+                let grid_idx: i64 = (val / hist.bin_width).round() as i64;
+                let entry: &mut (usize, usize) = grid.entry(grid_idx).or_insert((0, 0));
                 if is_tp { entry.0 += count; } else { entry.1 += count; }
             }
         }
@@ -110,11 +109,14 @@ fn compute_curves(
     insert_hist(fp_ctrl_hist, false);
     insert_hist(fp_cross_hist, false);
 
-    let total_p_f64: f64 = total_p.max(1) as f64; // Prevent div by 0
-    let total_n_f64: f64 = total_n.max(1) as f64;
+    // FIX: Apply the exact domain logic from the JS implementation
+    // Multiply by 2 (e.g., for paired-end reads) and add total cross FPs to the negative pool
+    let cross_fp_total: usize = fp_cross_hist.counts.iter().sum();
+    let total_p_f64: f64 = (total_p * 2).max(1) as f64;
+    let total_n_f64: f64 = ((total_n * 2) + cross_fp_total).max(1) as f64;
 
     let mut roc_curve: Vec<[f64; 2]> = vec![[0.0, 0.0]];
-    let mut pr_curve: Vec<[f64; 2]> = vec![[0.0, 1.0]]; // Recall 0, Precision 1 is standard start
+    let mut pr_curve: Vec<[f64; 2]> = vec![]; 
 
     let mut tp_sum: usize = 0;
     let mut fp_sum: usize = 0;
@@ -122,9 +124,12 @@ fn compute_curves(
     let mut pr_auc: f64 = 0.0;
 
     let mut prev_fpr: f64 = 0.0;
-    let mut prev_tpr:f64 = 0.0;
+    let mut prev_tpr: f64 = 0.0;
     let mut prev_recall: f64 = 0.0;
-    let mut prev_precision: f64 = 1.0;
+    
+    // PR precision starts at 1.0 when nothing is selected
+    let mut prev_precision: f64 = 1.0; 
+    pr_curve.push([0.0, 1.0]);
 
     // 2. Sweep from highest score downwards
     for (_, (tp_count, fp_count)) in grid.iter().rev() {
@@ -150,6 +155,20 @@ fn compute_curves(
         prev_tpr = tpr;
         prev_recall = tpr;
         prev_precision = precision;
+    }
+
+    // 3. Anchor the curves to negative infinity (unmapped reads)
+    // Ensures lines extend to the right and AUC is fully calculated on a [0, 1] domain
+    if prev_fpr < 1.0 || prev_tpr < 1.0 {
+        let final_fpr: f64 = 1.0;
+        let final_tpr: f64 = 1.0;
+        let final_precision: f64 = total_p_f64 / (total_p_f64 + total_n_f64);
+
+        roc_auc += (final_fpr - prev_fpr) * (final_tpr + prev_tpr) / 2.0;
+        pr_auc += (final_tpr - prev_recall) * (final_precision + prev_precision) / 2.0;
+
+        roc_curve.push([final_fpr, final_tpr]);
+        pr_curve.push([final_tpr, final_precision]);
     }
 
     CurveData { roc_curve, pr_curve, roc_auc, pr_auc }
@@ -277,19 +296,37 @@ r#"<!DOCTYPE html>
                 prTable.innerHTML += `<tr><td>${{dataset.id}}</td><td>${{curves.pr_auc.toFixed(4)}}</td></tr>`;
             }});
 
+            const config = {{
+                displaylogo: false
+            }};
+
             Plotly.react('rocPlot', rocTraces, {{
                 title: 'Receiver Operating Characteristic (ROC)',
-                xaxis: {{ title: 'False Positive Rate (FPR)', range: [-0.01, 1.01] }},
-                yaxis: {{ title: 'True Positive Rate (TPR)', range: [-0.01, 1.01] }},
-                margin: {{ l: 60, r: 20, t: 40, b: 50 }}
-            }});
+                xaxis: {{ title: 'False Positive Rate (FPR)', range: [-0.02, 1.02] }},
+                yaxis: {{ title: 'True Positive Rate (TPR)', range: [-0.02, 1.02] }},
+                margin: {{ l: 60, r: 20, t: 40, b: 50 }},
+                shapes: [
+                    {{
+                        type: 'line',
+                        x0: 0,
+                        y0: 0,
+                        x1: 1,
+                        y1: 1,
+                        line: {{
+                            color: 'rgba(0,0,0,0.3)',
+                            width: 2,
+                            dash: 'dash'
+                        }}
+                    }}
+                ]
+            }}, config);
 
             Plotly.react('prPlot', prTraces, {{
                 title: 'Precision-Recall (PR) Curve',
-                xaxis: {{ title: 'Recall', range: [-0.01, 1.01] }},
-                yaxis: {{ title: 'Precision', range: [-0.01, 1.01] }},
+                xaxis: {{ title: 'Recall', range: [-0.02, 1.02] }},
+                yaxis: {{ title: 'Precision', range: [-0.02, 1.02] }},
                 margin: {{ l: 60, r: 20, t: 40, b: 50 }}
-            }});
+            }}, config);
         }}
 
         // Listen for dropdown changes
