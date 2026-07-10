@@ -154,11 +154,13 @@ impl ComposeConfig {
 // Analyze config - reads manifest.tsv output from pfqsim analyze
 // ============================================================================
 
+/// Struct to hold data from a manifest.tsv created by pfqsim compose.
+/// Uses keyword "NEGATIVE" and calculated_reads to determine true negatives.
 #[derive(Deserialize)]
 pub(crate) struct AnalyzeRow {
-    //pub(crate) id: String,      // E.g., "GRCh38" -> matches read header `@{id}:...`
-    pub(crate) keyword: String, // Keyword used in generating reads @id:keyword:accession:read_number
-    pub(crate) calculated_reads: usize,    // The calculated read allocation from compose step
+    //pub(crate) id: String,             // E.g., "GRCh38" -> matches read header `@{id}:...`
+    pub(crate) keyword: String,          // Keyword used in generating reads @id:keyword:accession:read_number
+    pub(crate) calculated_reads: usize,  // The calculated read allocation from compose step
 }
 
 pub(crate) struct AnalyzeConfig {
