@@ -241,7 +241,7 @@ r#"<!DOCTYPE html>
             <option value="align_length">Alignment Length</option>
             <option value="as_al">Score per Aligned Base (AS/AL)</option>
             <option value="align_proportion">Alignment Proportion</option>
-            <option value="percent_identity">Alignment Accuracy</option>
+            <option value="percent_identity">Percent Identity</option>
         </select>
     </div>
 
