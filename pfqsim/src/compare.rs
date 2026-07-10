@@ -297,10 +297,15 @@ r#"<!DOCTYPE html>
                 prTable.innerHTML += `<tr><td>${{dataset.id}}</td><td>${{curves.pr_auc.toFixed(4)}}</td></tr>`;
             }});
 
-            const config = {{
-                displaylogo: false
-            }};
+            const getPlotConfig = (prefix) => ({{
+                toImageButtonOptions: {{
+                    format: 'svg', 
+                    filename: prefix + '_' + metricKey 
+                }},
+                displaylogo: false 
+            }});
 
+            // 2. ROC Plot with its specific config
             Plotly.react('rocPlot', rocTraces, {{
                 title: 'Receiver Operating Characteristic (ROC)',
                 xaxis: {{ title: 'False Positive Rate (FPR)', range: [-0.02, 1.02] }},
@@ -320,14 +325,15 @@ r#"<!DOCTYPE html>
                         }}
                     }}
                 ]
-            }}, config);
+            }}, getPlotConfig('ROC_Curve'));
 
+            // 3. PR Plot with its specific config
             Plotly.react('prPlot', prTraces, {{
                 title: 'Precision-Recall (PR) Curve',
                 xaxis: {{ title: 'Recall', range: [-0.02, 1.02] }},
                 yaxis: {{ title: 'Precision', range: [-0.02, 1.02] }},
                 margin: {{ l: 60, r: 20, t: 40, b: 50 }}
-            }}, config);
+            }}, getPlotConfig('PR_Curve'));
         }}
 
         // Listen for dropdown changes
