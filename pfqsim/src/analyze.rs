@@ -213,7 +213,7 @@ fn evaluate_and_accumulate_pair(
             target_pool.align_proportion.increment(val as f64);
         }
         if let Some(val) = record.calculate_alignment_accuracy() {
-            target_pool.align_accuracy.increment(val as f64);
+            target_pool.percent_identity.increment(val as f64);
         }
     }
 }

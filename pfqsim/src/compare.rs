@@ -40,7 +40,7 @@ pub(crate) fn run(args: CompareArgs) -> io::Result<()> {
         curves.insert("align_length".to_string(), compute_curves(&report.true_positives.align_length, &report.false_positives_control.align_length, &report.false_positives_cross.align_length, p, n));
         curves.insert("as_al".to_string(), compute_curves(&report.true_positives.as_al, &report.false_positives_control.as_al, &report.false_positives_cross.as_al, p, n));
         curves.insert("align_proportion".to_string(), compute_curves(&report.true_positives.align_proportion, &report.false_positives_control.align_proportion, &report.false_positives_cross.align_proportion, p, n));
-        curves.insert("align_accuracy".to_string(), compute_curves(&report.true_positives.align_accuracy, &report.false_positives_control.align_accuracy, &report.false_positives_cross.align_accuracy, p, n));
+        curves.insert("percent_identity".to_string(), compute_curves(&report.true_positives.percent_identity, &report.false_positives_control.percent_identity, &report.false_positives_cross.percent_identity, p, n));
 
         payloads.push(ComparePayload {
             id: row.id,
@@ -241,7 +241,7 @@ r#"<!DOCTYPE html>
             <option value="align_length">Alignment Length</option>
             <option value="as_al">Score per Aligned Base (AS/AL)</option>
             <option value="align_proportion">Alignment Proportion</option>
-            <option value="align_accuracy">Alignment Accuracy</option>
+            <option value="percent_identity">Alignment Accuracy</option>
         </select>
     </div>
 

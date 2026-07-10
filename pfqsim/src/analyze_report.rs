@@ -53,7 +53,7 @@ pub(crate) struct MetricPayload {
     pub(crate) align_length: Histogram,
     pub(crate) as_al: Histogram,
     pub(crate) align_proportion: Histogram,
-    pub(crate) align_accuracy: Histogram,
+    pub(crate) percent_identity: Histogram,
 }
 
 impl MetricPayload {
@@ -66,7 +66,7 @@ impl MetricPayload {
             align_length: Histogram::new(0.0, 1000.0, 1.0),
             as_al: Histogram::new(0.0, 1000.0, 0.1),
             align_proportion: Histogram::new(0.0, 1.0, 0.01),
-            align_accuracy: Histogram::new(0.0, 1.0, 0.01),
+            percent_identity: Histogram::new(0.0, 100.0, 1.0),
         }
     }
 
@@ -77,7 +77,7 @@ impl MetricPayload {
         self.align_length.trim();
         self.as_al.trim();
         self.align_proportion.trim();
-        self.align_accuracy.trim();
+        self.percent_identity.trim();
     }
 }
 
@@ -234,7 +234,7 @@ pub(crate) fn generate_evaluation_reports(
                         <option value="align_length">Alignment Length (AL)</option>
                         <option value="as_al">AS / AL (Score per Base)</option>
                         <option value="align_proportion">Alignment Proportion (AL/RL)</option>
-                        <option value="align_accuracy">Percent Identity (PI)</option>
+                        <option value="percent_identity">Percent Identity (PI)</option>
                         <option value="mapq">Mapping Quality (MAPQ)</option>
                     </select>
                 </div>
@@ -259,7 +259,7 @@ pub(crate) fn generate_evaluation_reports(
 
     <script>
         const payload = {json_raw};
-        const metrics = ['align_score', 'align_length', 'as_al', 'align_proportion', 'align_accuracy', 'mapq'];
+        const metrics = ['align_score', 'align_length', 'as_al', 'align_proportion', 'percent_identity', 'mapq'];
 
         // 1. O(N) Pre-computation: Build Suffix Sums on page load
         function initHistograms() {{
