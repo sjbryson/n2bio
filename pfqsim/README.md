@@ -96,7 +96,7 @@ The configuration file requires the following fields:
 
     - id: [String]  This will be incorporated into the sequence identifier for all reads generated from each row's genome ("@{id}:...).
     - keyword: [String]  This is incroporated as the second position in each sequence identifier (e.g. @{id}:{keyword}:...) 
-    - abundance: [f64]  Relative abundance of total reads (range: 0-1) to generate for each row's genome. Used to calculate the number of reads to generate for each row - calculation based on proprtion of total reads (default abundance mode "reads") or proportion of genome copies (abundance mode "copies")
+    - abundance: [f64]  Relative abundance of total reads to generate for each row's genome. Used to calculate the number of reads to generate for each row - calculation based on proprtion of total reads (default abundance mode "reads") or proportion of genome copies (abundance mode "copies")
     - fasta: [Path] Path to the genome fasta for this row.
     - circular: [bool]  Should the genome in this row be circularized before read generation. Only works with single contig genomes.
     - sub_rate: [f64] Substitution rate (range: 0-1) to apply to simulated reads.
