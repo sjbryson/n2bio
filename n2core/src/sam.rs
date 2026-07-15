@@ -126,7 +126,7 @@ impl <T: SamFields>CigarString for T {
                         read_len += current_num;
                     }
                     'N' | 'P' => {
-                        // N is a reference skip (RNA-seq splicing)
+                        // N is a reference skip
                         // P is padding,
                     }
                     'H' => {
