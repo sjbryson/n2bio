@@ -12,7 +12,7 @@ Commands:
   model     Build insert size and Q-score distributions from a BAM file
   generate  Generate a simulated paired-read library from a reference FASTA
   compose   Compose a final metagenomic library based on an abundance config
-  analyze   Analyze alignments from stdin sam or a bam file
+  analyze   Analyze alignments from a name sorted bam file
   help      Print this message or the help of the given subcommand(s)
 
 Options:
