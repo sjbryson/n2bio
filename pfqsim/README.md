@@ -20,7 +20,7 @@ Options:
   -V, --version  Print version
 ```
 
-- **pfqsim model** - Build insert size, read length, and Q-score distributions from a name sorted BAM file. Make sure the bam was name sorted e.g. samtools sort -n -o name_sorted.bam -
+- **pfqsim model** - Build insert size, read length, and Q-score distributions from a name sorted BAM file. Make sure the bam was name sorted e.g. samtools sort -n -o name_sorted.bam - . The assumption here is that you want to test the type of reads you would have after performing QC (e.g. running fastp) on a library, so pick a bam file that was created using a post-QC library.
 
 ```
 Usage: pfqsim model [OPTIONS] --bam <BAM> --model <MODEL>
