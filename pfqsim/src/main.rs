@@ -28,7 +28,7 @@ fn main() -> io::Result<()> {
         Commands::Generate(gen_args)    => generate::run(gen_args)?,
         Commands::Compose(comp_args)    => compose::run(comp_args)?,
         Commands::Analyze(analyze_args) => analyze::run(analyze_args)?,
-        Commands::Compare(compare_args) => compare::run(compare_args)?, //// FIX to new compose::run()
+        Commands::Compare(compare_args) => compare::run(compare_args)?,
     }
 
     Ok(())
