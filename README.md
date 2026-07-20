@@ -41,6 +41,12 @@ cargo build --release
 
 ### Cli Tools:
 
+#### <img width="300" alt="peat-logo" src="./assets/peat-logo.png" />PEAT - Paired-End Alignment Tools
+- This will be the new home for fastfilter, fastcov, & bamrep -> peat filter, peat coverage, and peat bamrep respectively.
+- peat filter will enable --lowpass and --highpass behaviors + an interleaved fastq stdout option.
+
+---
+
 **fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 
 **Pipeline example:**
