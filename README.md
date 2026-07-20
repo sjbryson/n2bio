@@ -41,7 +41,8 @@ cargo build --release
 
 ### Cli Tools:
 
-#### <img width="300" alt="peat-logo" src="./assets/peat-logo.png" />PEAT - Paired-End Alignment Tools
+<p style="text-align: center"><img width="200" alt="peat-logo" src="./assets/peat-logo.png" /></p>
+#### <u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools
 - This will be the new home for fastfilter, fastcov, & bamrep -> peat filter, peat coverage, and peat bamrep respectively.
 - peat filter will enable --lowpass and --highpass behaviors + an interleaved fastq stdout option.
 
