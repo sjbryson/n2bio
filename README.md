@@ -1,4 +1,4 @@
-<img width="2260" height="800" alt="logo-n2bio 2" src="https://github.com/user-attachments/assets/2adfdafa-0ba3-4aa8-a891-75bb35e3871f" />
+<img width="1200" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
 
 ## n2bio - a rust workspace for building bioinformatics cli tools
 
@@ -42,7 +42,9 @@ cargo build --release
 ### Cli Tools:
 
 <p style="text-align: center"><img width="200" alt="peat-logo" src="./assets/peat-logo.png" /></p>
-#### <u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools
+
+**<p style="text-align: center"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</p>**
+
 - This will be the new home for fastfilter, fastcov, & bamrep -> peat filter, peat coverage, and peat bamrep respectively.
 - peat filter will enable --lowpass and --highpass behaviors + an interleaved fastq stdout option.
 
