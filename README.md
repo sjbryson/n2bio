@@ -108,7 +108,7 @@ Options:
 
 **vref2db/** - NCBI Virus-Host taxonomy DB builder. Create an SQLite database for a set of reference viral sequences (NCBI Accessions). 
 
-1. Start by generating a list of Accession ID's from a fasta file:
+1. Start by generating a list of Accession ID's from your reference genomes fasta file:
 
 ```
 grep ">" viral_refs.fna | awk '{print $1}' | sed 's/>//' > viral_refs.accessions.txt
@@ -177,6 +177,8 @@ Options:
 See the [pfqsim README](./pfqsim/README.md) for more information and examples.
 
   ---
+
+### Cli Utilities:
 
 **pfqbz2gz/** - Tool to convert paired fastq records in bz2 format to gz format.
 
