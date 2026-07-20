@@ -1,0 +1,9 @@
+[package]
+name = "peat"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

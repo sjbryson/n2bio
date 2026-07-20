@@ -26,7 +26,16 @@ cargo build --release
 
 ### Modules:
 
-**n2core/** - Modules I'm developing to work with standard file formats and IO.
+**n2core/** - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
+  - sam.rs      - read and work with SAM formatted alignment records.
+  - bam.rs      - read and work with BAM formatted alignment records.
+  - fastq.rs    - read and write fastq files.
+  - fasta.rs    - read and write fasta files.
+  - sequence.rs - traits to work with DNA sequence data.
+  - kmer.rs     - traits to work with kmers.
+  - hist.rs     - structs and functions to work with distributions and associated stats.
+  - readers.rs  - boilerplate code for reading files and stdin.
+  - writers.rs  - boilerplate code for writing data to files and stdout.
 
 ---
 
@@ -148,22 +157,6 @@ Options:
 
 ---
 
-**pfqbz2gz/** - Tool to convert paired fastq records in bz2 format to gz format.
-
-```
-Usage: pfqbz2gz [OPTIONS] --r1 <R1> --r2 <R2> --output-prefix <OUTPUT_PREFIX>
-
-Options:
-  -1, --r1 <R1>                        Path to R1 bz2 file
-  -2, --r2 <R2>                        Path to R2 bz2 file
-  -o, --output-prefix <OUTPUT_PREFIX>  Output prefix for the new gz files (e.g. 'sample1' becomes 'sample1_R1.fq.gz')
-  -t, --threads <THREADS>              Total CPU threads to allocate across the pipeline [default: 4]
-  -h, --help                           Print help
-  -V, --version                        Print version
-```
-
----
-
 **pfqsim/** - Suite of tools to generate synthetic sequencing libraries and test alignment based classification performance.
 
 ```
@@ -185,4 +178,18 @@ See the [pfqsim README](./pfqsim/README.md) for more information and examples.
 
   ---
 
-**xbag/** - Very experimental code for building nucleotide variation graphs from a set of closely related (e.g. strain/species) genomes.
+**pfqbz2gz/** - Tool to convert paired fastq records in bz2 format to gz format.
+
+```
+Usage: pfqbz2gz [OPTIONS] --r1 <R1> --r2 <R2> --output-prefix <OUTPUT_PREFIX>
+
+Options:
+  -1, --r1 <R1>                        Path to R1 bz2 file
+  -2, --r2 <R2>                        Path to R2 bz2 file
+  -o, --output-prefix <OUTPUT_PREFIX>  Output prefix for the new gz files (e.g. 'sample1' becomes 'sample1_R1.fq.gz')
+  -t, --threads <THREADS>              Total CPU threads to allocate across the pipeline [default: 4]
+  -h, --help                           Print help
+  -V, --version                        Print version
+```
+
+---

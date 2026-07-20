@@ -1027,6 +1027,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "peat"
+version = "0.1.0"
+
+[[package]]
 name = "petgraph"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1805,16 +1809,6 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
-]
-
-[[package]]
-name = "xbag"
-version = "0.1.0"
-dependencies = [
- "clap",
- "n2core",
- "serde",
- "serde_json",
 ]
 
 [[package]]

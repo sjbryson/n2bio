@@ -10,7 +10,7 @@ members = [
     "pfqbz2gz",
     "pfqsim",
     "bamrep",
-    "xbag", 
+    "peat", 
 ]
 
 [workspace.package]
