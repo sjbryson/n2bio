@@ -54,33 +54,35 @@ struct Args {
     min_mq: Option<u32>,
 }
 
-/// Filter logic for whether an alignment passes - i.e. aligned well in this use case.
+/// Filter logic for whether an alignment passes - i.e. aligned well.
+/// Returns false if read is unmapped or fails any optional threshold (val < min).
 fn sam_filter(sam: &SamStr, args: &Args) -> bool {
-   
-    if sam.is_mapped() {
-    
-        // Evaluate optional filters
-        if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val >= min)) {
-            return true;
-        }
-        if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_accuracy().ok().flatten().is_some_and(|val: f32| val >= min)) {
-            return true;
-        }
-        if args.min_as.is_some_and(|min: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val >= min)) {
-            return true;
-        }
-        if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val >= min)) {
-            return true;
-        }
-        if args.min_sl.is_some_and(|min: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val >= min)) {
-            return true;
-        }
-        if args.min_mq.is_some_and(|min: u32| sam.mapq() >= min) {
-            return true;
-        }
+    // Check if read is mapped
+    if !sam.is_mapped() {
+        return false;
+    }   
+    // Evaluate optional filters
+    if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val < min)) {
+        return false;
     }
-    // If it is mapped but didn't pass any of the specified min thresholds or is unmapped
-    false
+    if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_accuracy().ok().flatten().is_some_and(|val: f32| val < min)) {
+        return false;
+    }
+    if args.min_as.is_some_and(|min: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val < min)) {
+        return false;
+    }
+    if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val < min)) {
+        return false;
+    }
+    if args.min_sl.is_some_and(|min: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val < min)) {
+        return false;
+    }
+    if args.min_mq.is_some_and(|min: u32| sam.mapq() < min) {
+        return false;
+    }
+
+    // If it is mapped and passed all of the specified min thresholds
+    true
 }
 
 #[derive(Debug, Clone)]
