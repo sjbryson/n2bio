@@ -198,23 +198,23 @@ mod tests {
     #[test]
     fn test_from_tsv() {
         let mut file: NamedTempFile = NamedTempFile::new().unwrap();
-        // Create TSV with tabs
-        writeln!(file, "id\tlatency\tis_active\tnotes").unwrap();
-        writeln!(file, "app_1\t45\ttrue\t").unwrap(); // Empty notes should be Null
-        writeln!(file, "app_2\t3.14\tfalse\tnull").unwrap(); // "null" notes should be Null
+        // Create TSV
+        writeln!(file, "id\tnum_value\tbool_value\tnotes").unwrap();
+        writeln!(file, "val_1\t45\ttrue\t").unwrap(); // Empty notes should be Null
+        writeln!(file, "val_2\t3.14\tfalse\tnull").unwrap(); // "null" notes should be Null
 
         let metadata: Metadata = Metadata::from_tsv(file.path(), "id").unwrap();
 
-        // Check app_1
-        let app1: &Value = metadata.lookup("app_1").expect("app_1 should exist");
-        assert_eq!(app1["latency"], Value::Number(45.into()));
-        assert_eq!(app1["is_active"], Value::Bool(true));
-        assert_eq!(app1["notes"], Value::Null);
+        // Check id1
+        let id1: &Value = metadata.lookup("val_1").expect("val_1 should exist");
+        assert_eq!(id1["num_value"], Value::Number(45.into()));
+        assert_eq!(id1["bool_value"], Value::Bool(true));
+        assert_eq!(id1["notes"], Value::Null);
 
-        // Check app_2
-        let app2: &Value = metadata.lookup("app_2").expect("app_2 should exist");
-        assert_eq!(app2["latency"], Value::Number(Number::from_f64(3.14).unwrap()));
-        assert_eq!(app2["is_active"], Value::Bool(false));
+        // Check id2
+        let id2: &Value = metadata.lookup("val_2").expect("val_2 should exist");
+        assert_eq!(id2["num_value"], Value::Number(Number::from_f64(3.14).unwrap()));
+        assert_eq!(id2["bool_value"], Value::Bool(false));
     }
 
     #[test]
@@ -234,23 +234,23 @@ mod tests {
         let mut file: NamedTempFile = NamedTempFile::new().unwrap();
         let json_data: &str = r#"
         [
-            {"id": "app_1", "role": "web"},
-            {"id": "app_2", "role": "db"}
+            {"id": "val_1", "property": "AA"},
+            {"id": "val_2", "property": "BB"}
         ]
         "#;
         write!(file, "{}", json_data).unwrap();
 
         let metadata: Metadata = Metadata::from_json(file.path(), "id").unwrap();
         
-        let app2: &Value = metadata.lookup("app_2").unwrap();
-        assert_eq!(app2["role"], Value::String("db".to_string()));
+        let id2: &Value = metadata.lookup("val_2").unwrap();
+        assert_eq!(id2["property"], Value::String("BB".to_string()));
     }
 
     #[test]
     fn test_from_json_array_fails_on_object() {
         let mut file: NamedTempFile = NamedTempFile::new().unwrap();
         // Write a dict instead of an array
-        let json_data: &str = r#"{"id": "app_1", "role": "web"}"#;
+        let json_data: &str = r#"{"id": "val_1", "property": "AA"}"#;
         write!(file, "{}", json_data).unwrap();
 
         let result: Result<Metadata, MetadataError> = Metadata::from_json(file.path(), "id");
@@ -262,14 +262,14 @@ mod tests {
     fn test_from_jsonl() {
         let mut file: NamedTempFile = NamedTempFile::new().unwrap();
         let jsonl_data: &str = "\
-            {\"id\": \"app_1\", \"role\": \"web\"}\n\
-            {\"id\": \"app_2\", \"role\": \"db\"}\n\
+            {\"id\": \"val_1\", \"property\": \"AA\"}\n\
+            {\"id\": \"val_2\", \"property\": \"BB\"}\n\
         ";
         write!(file, "{}", jsonl_data).unwrap();
 
         let metadata: Metadata = Metadata::from_jsonl(file.path(), "id").unwrap();
         
-        let app1: &Value = metadata.lookup("app_1").unwrap();
-        assert_eq!(app1["role"], Value::String("web".to_string()));
+        let id1: &Value = metadata.lookup("val_1").unwrap();
+        assert_eq!(id1["property"], Value::String("AA".to_string()));
     }
 }
