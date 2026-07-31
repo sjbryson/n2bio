@@ -10,3 +10,4 @@ pub mod fasta;
 pub mod sequence;
 pub mod kmer;
 pub mod hist;
+pub mod metadata;
