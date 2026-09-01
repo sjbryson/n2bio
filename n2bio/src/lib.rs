@@ -1,5 +1,4 @@
-//! n2core/src/lib.rs
-
+//! n2bio/src/lib.rs
 
 pub mod readers;
 pub mod writers;

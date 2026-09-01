@@ -5,8 +5,8 @@ use std::io::{ self, Error, ErrorKind };
 use rand::RngExt; 
 use rand::distr::{ Distribution, weighted::WeightedIndex };
 
-use n2core::fasta::{ FastaReader, FastaRecord };
-use n2core::readers::ReaderType;
+use n2bio::fasta::{ FastaReader, FastaRecord };
+use n2bio::readers::ReaderType;
 
 // ============================================================================
 // Contig

@@ -3,8 +3,8 @@
 use serde::Serialize;
 use std::collections::HashMap;
 
-use n2core::bam::{ BamRecord, BamFlags, BamStats };
-use n2core::hist::Histogram;
+use n2bio::bam::{ BamRecord, BamFlags, BamStats };
+use n2bio::hist::Histogram;
 
 // ============================================================================
 // Global Stats

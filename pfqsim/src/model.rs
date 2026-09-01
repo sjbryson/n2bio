@@ -5,7 +5,7 @@ use std::io::{ self, Error, ErrorKind };
 use std::time::Instant;
 use std::fs::File;
 
-use n2core::bam::{ BamReader, BamRecord, BamStats, BamFlags };
+use n2bio::bam::{ BamReader, BamRecord, BamStats, BamFlags };
 
 use crate::cli::ModelArgs;
 use crate::modelstats::ModelStats;

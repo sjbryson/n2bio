@@ -1,7 +1,7 @@
-# n2bio/n2core/Cargo.toml
+# n2bio/Cargo.toml
 
 [package]
-name = "n2core"
+name = "n2bio"
 version.workspace = true
 authors.workspace = true
 description.workspace = true

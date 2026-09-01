@@ -3,7 +3,7 @@
 use serde::Serialize;
 use std::collections::HashMap;
 
-use n2core::bam::{ BamRecord, BamFlags, BamStats };
+use n2bio::bam::{ BamRecord, BamFlags, BamStats };
 use crate::report::ReportConfig;
 
 // ============================================================================

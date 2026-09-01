@@ -2,7 +2,7 @@
 //! 
 
 use clap::Args;
-use n2core::sam::{SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::sam::{SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 use crate::cli::ThresholdMetrics;
 
 // ============================================================================

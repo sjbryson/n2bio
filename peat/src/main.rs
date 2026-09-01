@@ -1,8 +1,6 @@
 //! n2bio/peat/src/main.rs
 //! 
 
-#![allow(unused)]
-
 mod cli;
 mod filter;
 mod coverage;
@@ -14,6 +12,7 @@ mod bamrep_report;
 
 use std::io;
 use clap::Parser;
+
 use crate::cli::{ Cli, Commands };
 
 

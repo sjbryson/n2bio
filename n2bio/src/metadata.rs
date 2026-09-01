@@ -1,4 +1,4 @@
-//! n2bio/n2core/src/metadata.rs
+//! n2bio/src/metadata.rs
 //! Core structs and traits for incorporating metadata into cli reports
 //! 
 

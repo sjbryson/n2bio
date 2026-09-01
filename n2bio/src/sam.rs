@@ -1,4 +1,4 @@
-//! n2core/src/sam.rs
+//! n2bio/src/sam.rs
 //! Core structures and traits for parsing, manipulating, and analyzing SAM records.
 
 use std::borrow::Cow;

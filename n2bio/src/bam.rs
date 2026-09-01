@@ -1,4 +1,4 @@
-//! n2bio/n2core/src/bam.rs
+//! n2bio/src/bam.rs
 
 use byteorder::{ LittleEndian, ReadBytesExt };
 use std::io::{ self, Read, ErrorKind };

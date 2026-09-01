@@ -1,4 +1,4 @@
-//! n2core/src/writers.rs
+//! n2bio/src/writers.rs
 //! Buffered writers for plain text and compressed files.
 
 use std::fs::File;

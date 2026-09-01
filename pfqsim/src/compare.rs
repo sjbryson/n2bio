@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use n2core::hist::Histogram;
+use n2bio::hist::Histogram;
 
 use crate::cli::CompareArgs;
 use crate::config::CompareConfig;

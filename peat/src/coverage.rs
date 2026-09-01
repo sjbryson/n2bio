@@ -15,7 +15,7 @@ use std::io::Write;
 use std::collections::HashMap;
 use rusqlite::Connection;
 
-use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 
 use crate::cli::CoverageArgs;
 use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };

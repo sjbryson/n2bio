@@ -1,4 +1,4 @@
-//! n2core/src/sequence.rs
+//! n2bio/src/sequence.rs
 //! Core traits and utilities for DNA sequence manipulation.
 
 use thiserror::Error;

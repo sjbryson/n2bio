@@ -7,9 +7,9 @@ use std::thread;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
-use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
-use n2core::fastq::{ShardedMateMap, PairedRead, PairedFastqWriter};
-use n2core::writers::WriterType;
+use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::fastq::{ShardedMateMap, PairedRead, PairedFastqWriter};
+use n2bio::writers::WriterType;
 
 
 #[derive(Parser, Debug, Clone)]

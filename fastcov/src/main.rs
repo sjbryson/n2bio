@@ -10,7 +10,7 @@ use std::time::Instant;
 use std::io::Write;
 use std::collections::HashMap;
 use rusqlite::Connection;
-use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 
 
 #[derive(Parser, Debug, Clone)]

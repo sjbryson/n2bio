@@ -11,11 +11,11 @@ use rand::RngExt;
 use std::time::Instant;
 use std::path::PathBuf;
 
-use n2core::fasta::FastaReader;
-use n2core::readers::ReaderType;
-use n2core::writers::WriterType;
-use n2core::fastq::{ FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWriter };
-use n2core::sequence::DnaSequence; 
+use n2bio::fasta::FastaReader;
+use n2bio::readers::ReaderType;
+use n2bio::writers::WriterType;
+use n2bio::fastq::{ FastqRecord, PairedFastqRecord, Read1, Read2, PairedFastqWriter };
+use n2bio::sequence::DnaSequence; 
 
 use crate::cli::GenerateArgs;
 use crate::modelstats::ModelStats;

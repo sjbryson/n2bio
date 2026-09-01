@@ -1,4 +1,4 @@
-//! n2core/src/readers.rs
+//! n2bio/src/readers.rs
 //! Buffered readers for plain text and compressed files.
 
 use std::io::{self, BufReader, Read, BufRead, Stdin};

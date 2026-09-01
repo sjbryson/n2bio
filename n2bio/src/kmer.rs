@@ -1,4 +1,4 @@
-//! n2core/src/kmer.rs
+//! n2bio/src/kmer.rs
 //! Utilities for k-mer hashing, encoding, and strand orientation.
 
 use std::collections::hash_map::DefaultHasher;

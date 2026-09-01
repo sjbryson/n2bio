@@ -3,7 +3,7 @@
 
 use serde::{ Serialize, Deserialize };
 
-use n2core::hist::Histogram;
+use n2bio::hist::Histogram;
 
 // ============================================================================
 // ModelStats

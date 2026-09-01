@@ -9,7 +9,7 @@ use rayon::prelude::*;
 
 mod stats;
 mod report;
-use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags };
+use n2bio::bam::{ BamReader, BamHeader, BamRecord, BamFlags };
 use crate::stats::{ GlobalStats, StatSummary, StatsAccumulator, ReportData };
 
 // ============================================================================

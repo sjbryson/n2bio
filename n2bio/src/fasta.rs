@@ -1,4 +1,4 @@
-//! n2core/src/fasta.rs
+//! n2bio/src/fasta.rs
 //! FastaRecord struct along with readers and writers.
 
 use std::io::{self, BufRead, Write};

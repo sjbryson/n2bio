@@ -5,8 +5,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
 use clap::Parser;
-use n2core::fastq::{PairedFastqReader, PairedFastqWriter, PairedFastqRecord};
-use n2core::writers::WriterType; 
+use n2bio::fastq::{PairedFastqReader, PairedFastqWriter, PairedFastqRecord};
+use n2bio::writers::WriterType; 
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Convert paired bz2 FASTQ to gz FASTQ using multi-threaded pipeline.")]

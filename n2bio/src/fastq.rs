@@ -1,4 +1,4 @@
-//! n2core/src/fastq.rs
+//! n2bio/src/fastq.rs
 
 use std::io::{self, Write, BufRead};
 use std::marker::PhantomData;

@@ -2,6 +2,7 @@
 //! 
 
 use std::path::PathBuf;
+
 use crate::bamrep_stats::{ ReportData, StatSummary, ReadStats };
 
 // ============================================================================

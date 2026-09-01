@@ -7,7 +7,7 @@ use std::path::{ Path, PathBuf };
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use n2core::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
+use n2bio::bam::{ BamReader, BamHeader, BamRecord, BamFlags, BamStats };
 
 use crate::config::AnalyzeConfig;
 use crate::cli::{ AnalyzeArgs, MappingMode };
