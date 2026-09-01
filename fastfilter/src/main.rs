@@ -125,7 +125,7 @@ fn main() -> io::Result<()> {
     let mut worker_handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(args.threads);
     for _ in 0..args.threads {
         let rx: crossbeam::channel::Receiver<String> = line_rx.clone();
-        let p_tx: crossbeam::channel::Sender<n2core::fastq::PairedFastqRecord> = pair_tx.clone();
+        let p_tx: crossbeam::channel::Sender<n2bio::fastq::PairedFastqRecord> = pair_tx.clone();
         let map: Arc<ShardedMateMap> = Arc::clone(&mate_map);
         let primary_counter: Arc<AtomicU64> = Arc::clone(&total_primary_reads);
         let worker_args: Args = args.clone();

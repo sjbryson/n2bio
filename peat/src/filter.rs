@@ -1,7 +1,6 @@
 //! n2bio/peat/src/filter.rs
 //! 
 
-use clap::Parser;
 use crossbeam::channel::bounded;
 use std::io::{self, BufRead, Write};
 use std::thread;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::sam::{SamReader, SamStr, SamFlags };
 use n2bio::fastq::{ShardedMateMap, PairedRead, PairedFastqWriter};
 use n2bio::writers::WriterType;
 
@@ -60,7 +59,7 @@ pub(crate) fn run(args: FilterArgs) -> io::Result<()> {
     let mut worker_handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(args.threads);
     for _ in 0..args.threads {
         let rx: crossbeam::channel::Receiver<String> = line_rx.clone();
-        let p_tx: crossbeam::channel::Sender<n2core::fastq::PairedFastqRecord> = pair_tx.clone();
+        let p_tx: crossbeam::channel::Sender<n2bio::fastq::PairedFastqRecord> = pair_tx.clone();
         let map: Arc<ShardedMateMap> = Arc::clone(&mate_map);
         let primary_counter: Arc<AtomicU64> = Arc::clone(&total_primary_reads);
         let worker_args: FilterArgs = args.clone();

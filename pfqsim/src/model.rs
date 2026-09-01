@@ -21,7 +21,7 @@ pub(crate) fn run(args: ModelArgs) -> io::Result<()> {
     let mut insert_sizes_modeled: usize  = 0;
     let max_insert_size: i32             = args.max_ins as i32;
     let mut bam_reader: BamReader        = BamReader::open(&args.bam)?;
-    let _header: n2core::bam::BamHeader  = bam_reader.read_header()?;
+    let _header: n2bio::bam::BamHeader  = bam_reader.read_header()?;
     let mut current_record: BamRecord    = BamRecord::default();
     let mut r1_record: Option<BamRecord> = None;
     let mut r2_record: Option<BamRecord> = None;

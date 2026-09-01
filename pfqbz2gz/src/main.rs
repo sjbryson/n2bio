@@ -56,7 +56,7 @@ fn main() -> io::Result<()> {
     });
 
     // Decompression / Reader Loop
-    let paired_reader: PairedFastqReader<n2core::readers::ReaderType, n2core::readers::ReaderType> = PairedFastqReader::from_bzs(&args.r1, &args.r2)?;
+    let paired_reader: PairedFastqReader<n2bio::readers::ReaderType, n2bio::readers::ReaderType> = PairedFastqReader::from_bzs(&args.r1, &args.r2)?;
     for result in paired_reader {
 
         // Send to the writer thread. Break the loop if writer crashes.

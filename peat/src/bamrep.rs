@@ -46,7 +46,7 @@ pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
                 total_pairs += 1;
                 // Only calculate insert size if valid primary/proper pair for this name
                 if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-                    alignment_stats.update_insert_size(r1, r2, args.min_mapq, args.max_ins as i32);
+                    alignment_stats.update_insert_size(r1, r2, args.min_mapq);
                 }
             }
             r1_record = None;
@@ -67,7 +67,7 @@ pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
     if !prev_qname.is_empty() {
         total_pairs += 1;
         if let (Some(r1), Some(r2)) = (&r1_record, &r2_record) {
-            alignment_stats.update_insert_size(r1, r2, args.min_mapq, args.max_ins as i32);
+            alignment_stats.update_insert_size(r1, r2, args.min_mapq);
         }
     }
 

@@ -205,7 +205,7 @@ impl StatsAccumulator {
         }
     }
 
-    pub fn update_insert_size(&mut self, r1: &BamRecord, r2: &BamRecord, min_mapq: usize, max_ins: i32) {
+    pub fn update_insert_size(&mut self, r1: &BamRecord, r2: &BamRecord, min_mapq: usize) {
         if r1.mapq as usize >= min_mapq && r2.mapq as usize >= min_mapq {
             if r1.ref_id == r2.ref_id && r1.ref_id != -1 {
                 let (fwd, rev) = if r1.pos <= r2.pos { (r1, r2) } else { (r2, r1) };

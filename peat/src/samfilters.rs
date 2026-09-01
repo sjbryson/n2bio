@@ -1,7 +1,6 @@
 //! n2bio/peat/src/pass.rs
 //! 
 
-use clap::Args;
 use n2bio::sam::{SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 use crate::cli::ThresholdMetrics;
 
