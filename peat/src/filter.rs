@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use crossbeam::channel::bounded;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::thread;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -142,7 +142,10 @@ pub(crate) fn run(args: FilterArgs) -> io::Result<()> {
         "MQ"             : args.thresholds.mapq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
     });
 
-    println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+    // Write JSON to file - {args.report}.json
+    let out_json: String = format!("{}.json", args.report);
+    let mut json_file: std::fs::File = std::fs::File::create(&out_json)?;
+    json_file.write_all(serde_json::to_string_pretty(&summary).unwrap().as_bytes())?;
 
     Ok(())
 }
