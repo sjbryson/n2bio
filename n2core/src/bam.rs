@@ -166,7 +166,7 @@ pub trait BamStats {
     fn calculate_alignment_proportion(&self) -> Option<f32>;  
     
     /// (Alignment length - NM) / Alignment length
-    fn calculate_alignment_accuracy(&self) -> Option<f32>;    
+    fn calculate_alignment_identity(&self) -> Option<f32>;    
 
     /// Calculates how many reference bases the alignment spans using the CIGAR string
     fn calculate_ref_span(&self) -> Option<u32>;
@@ -315,7 +315,7 @@ impl BamStats for BamRecord {
         }
     }
 
-    fn calculate_alignment_accuracy(&self) -> Option<f32> {
+    fn calculate_alignment_identity(&self) -> Option<f32> {
         let align_len: u32 = self.calculate_alignment_length()?;
         let nm: i32 = self.get_int_tag(b"NM")?;
         
@@ -607,7 +607,7 @@ mod tests {
         let record: BamRecord = create_record(100, &[(100, 0)], tags);
 
         // (100 - 5) / 100 * 100 = 95.0%
-        assert_eq!(record.calculate_alignment_accuracy(), Some(95.0));
+        assert_eq!(record.calculate_alignment_identity(), Some(95.0));
     }
 
     #[test]
@@ -618,7 +618,7 @@ mod tests {
         let tags: Vec<u8> = vec![b'N', b'M', b'C', 15];
         let record: BamRecord = create_record(10, &[(10, 0)], tags);
 
-        assert_eq!(record.calculate_alignment_accuracy(), Some(0.0));
+        assert_eq!(record.calculate_alignment_identity(), Some(0.0));
     }
 
     #[test]
@@ -629,7 +629,7 @@ mod tests {
         assert_eq!(record.calculate_alignment_length(), None);
         assert_eq!(record.calculate_as_al(), None);
         assert_eq!(record.calculate_alignment_proportion(), None);
-        assert_eq!(record.calculate_alignment_accuracy(), None);
+        assert_eq!(record.calculate_alignment_identity(), None);
     }
 
     #[test]

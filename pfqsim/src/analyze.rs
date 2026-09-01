@@ -212,7 +212,7 @@ fn evaluate_and_accumulate_pair(
         if let Some(val) = record.calculate_alignment_proportion() {
             target_pool.align_proportion.increment(val as f64);
         }
-        if let Some(val) = record.calculate_alignment_accuracy() {
+        if let Some(val) = record.calculate_alignment_identity() {
             target_pool.percent_identity.increment(val as f64);
         }
     }

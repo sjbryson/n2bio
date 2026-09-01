@@ -205,7 +205,7 @@ impl StatsAccumulator {
         if let Some(val) = r.calculate_alignment_proportion() { 
             align_prop_vec.push((val as f64).min(max_align_prop)); 
         }
-        if let Some(val) = r.calculate_alignment_accuracy() { 
+        if let Some(val) = r.calculate_alignment_identity() { 
             align_acc_vec.push((val as f64).min(max_align_pi)); 
         }
     }
