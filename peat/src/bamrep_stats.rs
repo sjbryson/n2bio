@@ -7,7 +7,7 @@ use n2core::bam::{ BamRecord, BamFlags, BamStats };
 use n2core::hist::Histogram;
 
 // ============================================================================
-// Global Stats (Unchanged)
+// Global Stats
 // ============================================================================
 
 #[derive(Serialize, Default, Clone, Debug)]
@@ -127,7 +127,7 @@ impl StatSummary {
 }
 
 // ============================================================================
-// Accumulator
+// Stats Accumulator
 // ============================================================================
 
 pub struct StatsAccumulator {
@@ -179,7 +179,7 @@ impl StatsAccumulator {
             return;
         }
 
-        let (mapq_hist, as_hist, al_hist, bs_hist, prop_hist, ident_hist) = 
+        let (mapq_hist, as_hist, al_hist, bs_hist, ap_hist, ai_hist) = 
             if r.is_read1() {
                 (&mut self.r1_mapq, &mut self.r1_align_score, &mut self.r1_align_length, &mut self.r1_base_score, &mut self.r1_align_proportion, &mut self.r1_align_identity)
             } else {
@@ -198,10 +198,10 @@ impl StatsAccumulator {
             bs_hist.increment(val as f64); 
         }
         if let Some(val) = r.calculate_alignment_proportion() { 
-            prop_hist.increment(val as f64); 
+            ap_hist.increment(val as f64); 
         }
         if let Some(val) = r.calculate_alignment_identity() { 
-            ident_hist.increment(val as f64); 
+            ai_hist.increment(val as f64); 
         }
     }
 
