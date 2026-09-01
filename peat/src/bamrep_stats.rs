@@ -103,7 +103,7 @@ impl Default for StatSummary {
 }
 
 impl StatSummary {
-    /// Extracts exact statistical summaries directly from a populated histogram.
+    /// Extracts stat summaries from histogram.
     pub fn from_histogram(mut hist: Histogram) -> Self {
         if hist.total_count() == 0 {
             return Self::default();
@@ -130,7 +130,6 @@ impl StatSummary {
 // Accumulator
 // ============================================================================
 
-/// Streams incoming read metrics directly into histograms without allocating large arrays.
 pub struct StatsAccumulator {
     pub pe_insert_size: Histogram,
 
@@ -150,7 +149,7 @@ pub struct StatsAccumulator {
 }
 
 impl StatsAccumulator {
-    /// Initializes all histograms with sensible metric-specific bounds and bin sizes.
+    /// Initialize all histograms
     pub fn new(max_len: usize, max_ins: i32) -> Self {
         let max_al: f64 = max_len as f64;
         let max_as: f64 = 2.0 * max_al;

@@ -84,7 +84,6 @@ pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
     println!("BAM reading complete. Processed {} pairs. Generating summaries and plots...", total_pairs);
 
     // Group all stats into a list so Rayon can process/finalize them concurrently
-    // (Assuming the fields inside StatsAccumulator now have a `.finalize()` or similar method to return a StatSummary)
     let mut stats_to_process = vec![
         ("pe_insert_size", alignment_stats.pe_insert_size),
         ("r1_mapq", alignment_stats.r1_mapq),
@@ -133,7 +132,6 @@ pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
         let mut html_path: PathBuf = args.report.clone();
         html_path.set_extension("html");
 
-        // Uses the updated generate_html_report function
         if let Err(e) = crate::bamrep_report::generate_html_report(&report_data, &html_path, &args.report) {
             eprintln!("Warning: Failed to generate HTML report: {}", e);
         }
