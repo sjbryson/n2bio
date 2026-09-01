@@ -148,7 +148,7 @@ pub trait AlignmentStats: CigarString + SamTags {
     fn calculate_as_al(&self) -> Result<Option<f32>, SamError>;                 // AS (alignment score) / AL (alignment length)
     fn calculate_alignment_length(&self) -> Result<Option<u32>, SamError>;      // from cigar string
     fn calculate_alignment_proportion(&self) -> Result<Option<f32>, SamError>;  // alignment length/read length
-    fn calculate_alignment_accuracy(&self) -> Result<Option<f32>, SamError>;    // (alignment length - NM)/alignment length
+    fn calculate_alignment_identity(&self) -> Result<Option<f32>, SamError>;    // (alignment length - NM)/alignment length
 }
 
 /// Blanket AlignmentStats implementation for anything that implements SamFields, SamTags & CigarString.
@@ -182,7 +182,7 @@ impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
     }
 
     /// Calculate alignment accuracy - i.e. % identity
-    fn calculate_alignment_accuracy(&self) -> Result<Option<f32>, SamError> {
+    fn calculate_alignment_identity(&self) -> Result<Option<f32>, SamError> {
         let Some((align_len, _, _, _)) = self.parse_cigar()? else { return Ok(None) };
         let Some(nm) = self.get_int_tag("NM") else { return Ok(None) };
         
@@ -511,7 +511,7 @@ mod tests {
         assert!((as_al.unwrap() - 0.8333).abs() < 0.001);
 
         // Accuracy -> (12 - 2) / 12 = 83.33%
-        let acc: Option<f32> = sam.calculate_alignment_accuracy().unwrap();
+        let acc: Option<f32> = sam.calculate_alignment_identity().unwrap();
         assert!((acc.unwrap() - 83.33).abs() < 0.01);
     }
 

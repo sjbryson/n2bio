@@ -1,4 +1,5 @@
-//! n2bio/fastfilter/src/main.rs
+//! n2bio/peat/src/filter.rs
+//! 
 
 use clap::Parser;
 use crossbeam::channel::bounded;
@@ -7,92 +8,26 @@ use std::thread;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
+
 use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 use n2core::fastq::{ShardedMateMap, PairedRead, PairedFastqWriter};
 use n2core::writers::WriterType;
 
+use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
+use crate::samfilters::{ lowpass_filter, highpass_filter, threshold_args };
 
-#[derive(Parser, Debug, Clone)]
-#[command(author, version, about = "High-performance SAM stream to paired FASTQ filter", long_about = None)]
-struct Args {
 
-    /// Number of worker threads for parsing and pairing
-    #[arg(short = 't', long, default_value_t = 4)]
-    threads: usize,
 
-    /// Number of shards for the mate pairing hash map (recommend 4-8x threads, default = 32)
-    #[arg(long, default_value_t = 32)]
-    shards: usize,
+pub(crate) fn run(args: FilterArgs) -> io::Result<()> {
 
-    /// Prefix for output files (e.g. 'out' -> out.r1.fq.gz, out.r2.fq.gz)
-    #[arg(short = 'p', long, required = true)]
-    fq_prefix: String,
-    
-    // make optional if --stdout interleaved or --interleaved (pe vs lr) options
+    let start_time: Instant = Instant::now(); // Start the clock
 
-    /// Name of the run/sample for the JSON report -> creates {report}.json #########################################
-    //#[arg(short = 'r', long, required = true)]                              // ====== Update output logic ===========
-    //report: String,
-
-    /// If none of the following optional max stats are set, only unmapped pairs are written.
-    /// Optional: Max Alignment Proportion - sam.calculate_alignment_proportion()
-    #[arg(long = "max-ap")]
-    max_ap: Option<f32>,
-    
-    /// Optional: Max Percent Identity - sam.calculate_alignment_accuracy()
-    #[arg(long = "max-pi")]
-    max_pi: Option<f32>,
-    
-    /// Optional: Max Alignment Score - sam.get_int_tag("AS")
-    #[arg(long = "max-as")]
-    max_as: Option<i32>,
-
-    /// Optional: Max Alignment Lenth - sam.calculate_alignment_length()
-    #[arg(long = "max-al")]
-    max_al: Option<u32>,
-    
-    /// Optional: Max AS/AL score (avg. AS per covered base) - sam.calculate_as_al()
-    #[arg(long = "max-sl")]
-    max_sl: Option<f32>,
-
-    /// Optional: Max MAPQ score - sam.mapq()
-    #[arg(long = "max-mq")]
-    max_mq: Option<u32>,
-}
-
-/// Filter logic for whether an alignment passes - didn't align well in this use case.
-fn sam_filter(sam: &SamStr, args: &Args) -> bool {
-    // Keep unmapped reads
-    if !sam.is_mapped() {
-        return true;
-    }
-    // Evaluate optional filters
-    if args.max_ap.is_some_and(|max: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val <= max)) {
-        return true;
-    }
-    if args.max_pi.is_some_and(|max: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val <= max)) {
-        return true;
-    }
-    if args.max_as.is_some_and(|max: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val <= max)) {
-        return true;
-    }
-    if args.max_al.is_some_and(|max: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val <= max)) {
-        return true;
-    }
-    if args.max_sl.is_some_and(|max: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val <= max)) {
-        return true;
-    }
-    if args.max_mq.is_some_and(|max: u32| sam.mapq() <= max) {
-        return true;
-    }
-    // If it is mapped but didn't pass any of the specified max thresholds
-    false
-}
-
-fn main() -> io::Result<()> {
-
-    let start_time: Instant = Instant::now(); // Start the clock!
-    let args: Args = Args::parse();
+    // Define filter function based on ThresholdMode (lowpass or highpass) and optional thresholds 
+    let has_thresholds: bool = threshold_args(&args.thresholds);
+    let sam_filter: fn(&SamStr<'_>, &ThresholdMetrics, bool) -> bool = match args.filter_mode {
+        ThresholdMode::LowPass => lowpass_filter,
+        ThresholdMode::HighPass => highpass_filter,
+    };
     
     // Initialize shared state & channels.
     let mate_map: Arc<ShardedMateMap> = Arc::new(ShardedMateMap::new(args.shards));
@@ -104,7 +39,7 @@ fn main() -> io::Result<()> {
 
     // Spawn FASTQ writer thread using multithreaded gzip.
     // Dedicate a couple of internal threads to the gzp compression engine.
-    let fq_prefix: String = args.fq_prefix.clone();
+    let fq_prefix: String = args.prefix.clone();
     let gz_threads: usize = if args.threads > 2 { 2 } else { 1 }; 
     let fastq_writer_handle: thread::JoinHandle<Result<usize, io::Error>> = thread::spawn(move || -> io::Result<usize> {
         let r1_writer: WriterType = WriterType::to_multithreaded_gz(&format!("{}.r1.fq.gz", fq_prefix), gz_threads)?;
@@ -128,7 +63,7 @@ fn main() -> io::Result<()> {
         let p_tx: crossbeam::channel::Sender<n2core::fastq::PairedFastqRecord> = pair_tx.clone();
         let map: Arc<ShardedMateMap> = Arc::clone(&mate_map);
         let primary_counter: Arc<AtomicU64> = Arc::clone(&total_primary_reads);
-        let worker_args: Args = args.clone();
+        let worker_args: FilterArgs = args.clone();
 
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
             for line in rx {               
@@ -136,7 +71,7 @@ fn main() -> io::Result<()> {
                 if !sam.is_primary() { continue; }
                 primary_counter.fetch_add(1, Ordering::Relaxed);
                 
-                if sam_filter(&sam, &worker_args) {
+                if sam_filter(&sam, &worker_args.thresholds, has_thresholds) {
 
                     // If passes filter - parse strictly and push to the ShardedMateMap.
                     let paired_read: PairedRead = PairedRead::from_samstr(&sam);
@@ -199,15 +134,16 @@ fn main() -> io::Result<()> {
         "total_pairs"    : total_pairs,
         "written_pairs"  : pairs_written,
         "orphaned_reads" : mate_map.orphan_count(),
-        "max_ap"         : args.max_ap.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_pi"         : args.max_pi.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_as"         : args.max_as.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_al"         : args.max_al.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_sl"         : args.max_sl.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_mq"         : args.max_mq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "AP"             : args.thresholds.align_prop.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "AI"             : args.thresholds.align_ident.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "AS"             : args.thresholds.align_score.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "AL"             : args.thresholds.align_length.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "BS"             : args.thresholds.base_score.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "MQ"             : args.thresholds.mapq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
     });
 
     println!("{}", serde_json::to_string_pretty(&summary).unwrap());
 
     Ok(())
 }
+

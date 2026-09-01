@@ -1,5 +1,20 @@
-//! n2bio/fastcov/src/main.rs
+//! n2bio/peat/src/coverage.rs
+//! 
 
+#![allow(unused)]
+
+use std::todo;
+use std::io;
+
+use crate::cli::CoverageArgs;
+
+
+
+pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
+    todo!()
+}
+
+/* 
 use clap::Parser;
 use crossbeam::channel::bounded;
 use std::io::{self, BufRead};
@@ -439,3 +454,4 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
+*/
