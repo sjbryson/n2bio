@@ -199,7 +199,7 @@ impl StatsAccumulator {
         if let Some(val) = r.calculate_alignment_length() { 
             align_len_vec.push((val as f64).min(max_al)); 
         }
-        if let Some(val) = r.calculate_as_al() { 
+        if let Some(val) = r.calculate_base_score() { 
             as_al_vec.push((val as f64).min(max_as_al)); 
         }
         if let Some(val) = r.calculate_alignment_proportion() { 

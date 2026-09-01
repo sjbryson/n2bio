@@ -157,7 +157,7 @@ pub trait BamStats {
     fn get_int_tag(&self, tag: &[u8; 2]) -> Option<i32>;
     
     /// AS (alignment score) / AL (alignment length)
-    fn calculate_as_al(&self) -> Option<f32>;                 
+    fn calculate_base_score(&self) -> Option<f32>;                 
     
     /// Sum of M, I, D, =, X operations from the CIGAR string
     fn calculate_alignment_length(&self) -> Option<u32>;      
@@ -257,7 +257,7 @@ impl BamStats for BamRecord {
         None
     }
 
-    fn calculate_as_al(&self) -> Option<f32> {
+    fn calculate_base_score(&self) -> Option<f32> {
         let align_len: u32 = self.calculate_alignment_length()?;
         let as_score: i32 = self.get_int_tag(b"AS")?;
         
@@ -575,7 +575,7 @@ mod tests {
         let record: BamRecord = create_record(80, &[(80, 0)], tags);
 
         // 120.0 / 80.0 = 1.5
-        assert_eq!(record.calculate_as_al(), Some(1.5));
+        assert_eq!(record.calculate_base_score(), Some(1.5));
     }
 
     #[test]
@@ -627,7 +627,7 @@ mod tests {
         let record: BamRecord = create_record(100, &[], vec![b'A', b'S', b'C', 40]);
 
         assert_eq!(record.calculate_alignment_length(), None);
-        assert_eq!(record.calculate_as_al(), None);
+        assert_eq!(record.calculate_base_score(), None);
         assert_eq!(record.calculate_alignment_proportion(), None);
         assert_eq!(record.calculate_alignment_identity(), None);
     }

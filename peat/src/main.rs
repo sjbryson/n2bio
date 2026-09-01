@@ -9,6 +9,8 @@ mod coverage;
 mod bamrep;
 mod binreads;
 mod samfilters;
+mod bamrep_stats;
+mod bamrep_report;
 
 use std::io;
 use clap::Parser;

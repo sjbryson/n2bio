@@ -4,17 +4,6 @@
 #![allow(unused)]
 
 use std::todo;
-use std::io;
-
-use crate::cli::CoverageArgs;
-
-
-
-pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
-    todo!()
-}
-
-/* 
 use clap::Parser;
 use crossbeam::channel::bounded;
 use std::io::{self, BufRead};
@@ -25,80 +14,16 @@ use std::time::Instant;
 use std::io::Write;
 use std::collections::HashMap;
 use rusqlite::Connection;
+
 use n2core::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 
+use crate::cli::CoverageArgs;
+use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
+use crate::samfilters::{ highpass_filter, threshold_args };
 
-#[derive(Parser, Debug, Clone)]
-#[command(author, version, about = "High-performance SAM filter", long_about = None)]
-struct Args {
-
-    /// Number of worker threads for parsing
-    #[arg(short = 't', long, default_value_t = 4)]
-    threads: usize,
-
-    /// Name of the run/sample for the JSON report -> creates {run_name}.json
-    #[arg(short = 'r', long, required = true)]
-    run_name: String,
-
-     /// Optional path to an SQLite taxonomy database (see vref2db)
-    #[arg(long)]
-    db: Option<String>,
-
-    /// Optional: Min Alignment Proportion - sam.calculate_alignment_proportion()
-    #[arg(long)]
-    min_ap: Option<f32>,
-    
-    /// Optional: Min Percent Identity - sam.calculate_alignment_accuracy()
-    #[arg(long)]
-    min_pi: Option<f32>,
-    
-    /// Optional: Min Alignment Score - sam.get_int_tag("AS")
-    #[arg(long)]
-    min_as: Option<i32>,
-
-    /// Optional: Min Alignment Lenth - sam.calculate_alignment_length()
-    #[arg(long)]
-    min_al: Option<u32>,
-    
-    /// Optional: Min AS/AL score - sam.calculate_as_al()
-    #[arg(long)]
-    min_sl: Option<f32>,
-
-    /// Optional: Min MAPQ score - sam.mapq()
-    #[arg(long)]
-    min_mq: Option<u32>,
-}
-
-/// Filter logic for whether an alignment passes - i.e. aligned well.
-/// Returns false if read is unmapped or fails any optional threshold (val < min).
-fn sam_filter(sam: &SamStr, args: &Args) -> bool {
-    // Check if read is mapped
-    if !sam.is_mapped() {
-        return false;
-    }   
-    // Evaluate optional filters
-    if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val < min)) {
-        return false;
-    }
-    if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val < min)) {
-        return false;
-    }
-    if args.min_as.is_some_and(|min: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val < min)) {
-        return false;
-    }
-    if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val < min)) {
-        return false;
-    }
-    if args.min_sl.is_some_and(|min: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val < min)) {
-        return false;
-    }
-    if args.min_mq.is_some_and(|min: u32| sam.mapq() < min) {
-        return false;
-    }
-
-    // If it is mapped and passed all of the specified min thresholds
-    true
-}
+// ============================================================================
+// Coverage Stats
+// ============================================================================
 
 #[derive(Debug, Clone)]
 struct RefStats {
@@ -139,10 +64,17 @@ enum PipelineMsg {
         cigar: String,
     },
 }
-fn main() -> io::Result<()> {
+
+// ============================================================================
+// Run Coverage
+// ============================================================================
+
+pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
+
     let start_time: Instant = Instant::now();
-    let args: Args          = Args::parse();
-    let out_json: String    = format!("{}.json", args.run_name);
+    
+    // Check for optional thresholds 
+    let has_thresholds: bool = threshold_args(&args.thresholds);
 
     // Global Counters
     let total_alignments: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
@@ -223,17 +155,17 @@ fn main() -> io::Result<()> {
         let rx: crossbeam::channel::Receiver<String>      = line_rx.clone();
         let h_tx: crossbeam::channel::Sender<PipelineMsg> = hit_tx.clone();
         
-        let t_align: Arc<AtomicU64> = Arc::clone(&total_alignments);
-        let p_prim: Arc<AtomicU64>  = Arc::clone(&passed_primary);
-        let p_sec: Arc<AtomicU64>   = Arc::clone(&passed_secondary);
-        let worker_args: Args       = args.clone();
+        let t_align: Arc<AtomicU64>   = Arc::clone(&total_alignments);
+        let p_prim: Arc<AtomicU64>    = Arc::clone(&passed_primary);
+        let p_sec: Arc<AtomicU64>     = Arc::clone(&passed_secondary);
+        let worker_args: CoverageArgs = args.clone();
 
         let handle: thread::JoinHandle<()> = thread::spawn(move || {
             for line in rx {
                 let sam: SamStr<'_> = SamStr::new(&line);
                 t_align.fetch_add(1, Ordering::Relaxed);
                 
-                if sam_filter(&sam, &worker_args) {
+                if highpass_filter(&sam, &worker_args.thresholds, has_thresholds) {
                     let is_primary: bool = sam.is_primary();
                     if is_primary {
                         p_prim.fetch_add(1, Ordering::Relaxed);
@@ -355,7 +287,7 @@ fn main() -> io::Result<()> {
 
         // Calculate RPK
         let k: f64   = ref_len_f64 / 1000.0;
-        let rpk: f64 = total_reads as f64 / k;
+        let rpk: f64 = stats.num_primary as f64 / k;
 
         // Query the SQLite Database for the Accession
         let lineage_json: serde_json::Value = if let Some(ref mut statement) = stmt {
@@ -430,28 +362,29 @@ fn main() -> io::Result<()> {
     }
 
     let summary: serde_json::Value = serde_json::json!({
-        "1-run_stats": {
-            "run_name"                    : args.run_name,
+        "alignment_stats": {
+            "report"                    : args.report,
             "total_run_time_seconds"      : start_time.elapsed().as_secs_f64(),
             "total_alignments"            : total_alignments.load(Ordering::Relaxed),
             "passed_primary_alignments"   : passed_primary.load(Ordering::Relaxed),
             "passed_secondary_alignments" : passed_secondary.load(Ordering::Relaxed),
             "num_refs_primary"            : num_refs_primary,
             "num_refs_secondary"          : num_refs_secondary,
-            "min_ap"                      : args.min_ap,
-            "min_pi"                      : args.min_pi,
-            "min_as"                      : args.min_as,
-            "min_al"                      : args.min_al,
-            "min_sl"                      : args.min_sl,
-            "min_mq"                      : args.min_mq,
+            "min_AP"                      : args.thresholds.align_prop.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AI"                      : args.thresholds.align_ident.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AS"                      : args.thresholds.align_score.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AL"                      : args.thresholds.align_length.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_BS"                      : args.thresholds.base_score.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_MQ"                      : args.thresholds.mapq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
         },
-        "2-coverage_stats"                : coverage_stats
+        "coverage_stats"                : coverage_stats
     });
 
     // Write JSON to file
+    let out_json: String = format!("{}.json", args.report);
     let mut json_file: std::fs::File = std::fs::File::create(&out_json)?;
     json_file.write_all(serde_json::to_string_pretty(&summary).unwrap().as_bytes())?;
 
     Ok(())
 }
-*/
+

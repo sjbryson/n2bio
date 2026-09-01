@@ -145,7 +145,7 @@ impl <T: SamFields>CigarString for T {
 
 /// Trait for some custom alignment stats
 pub trait AlignmentStats: CigarString + SamTags {
-    fn calculate_as_al(&self) -> Result<Option<f32>, SamError>;                 // AS (alignment score) / AL (alignment length)
+    fn calculate_base_score(&self) -> Result<Option<f32>, SamError>;                 // AS (alignment score) / AL (alignment length)
     fn calculate_alignment_length(&self) -> Result<Option<u32>, SamError>;      // from cigar string
     fn calculate_alignment_proportion(&self) -> Result<Option<f32>, SamError>;  // alignment length/read length
     fn calculate_alignment_identity(&self) -> Result<Option<f32>, SamError>;    // (alignment length - NM)/alignment length
@@ -154,8 +154,8 @@ pub trait AlignmentStats: CigarString + SamTags {
 /// Blanket AlignmentStats implementation for anything that implements SamFields, SamTags & CigarString.
 impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
     
-    /// Calculate AS/AL (Alignment Score divided by Alignment Length)
-    fn calculate_as_al(&self) -> Result<Option<f32>, SamError> {
+    /// Calculate base score AS/AL (Alignment Score divided by Alignment Length)
+    fn calculate_base_score(&self) -> Result<Option<f32>, SamError> {
         let Some((align_len, _, _, _)) = self.parse_cigar()? else { return Ok(None) };
         let Some(as_score) = self.get_int_tag("AS") else { return Ok(None) };
         
@@ -181,7 +181,7 @@ impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
         }
     }
 
-    /// Calculate alignment accuracy - i.e. % identity
+    /// Calculate alignment identity - i.e. % identity
     fn calculate_alignment_identity(&self) -> Result<Option<f32>, SamError> {
         let Some((align_len, _, _, _)) = self.parse_cigar()? else { return Ok(None) };
         let Some(nm) = self.get_int_tag("NM") else { return Ok(None) };
@@ -507,7 +507,7 @@ mod tests {
     fn test_alignment_stats() {
         let sam: SamStr<'_> = SamStr::new(TEST_SAM_LINE);
         // AS/AL -> 10 / 12 = 0.8333...
-        let as_al: Option<f32> = sam.calculate_as_al().unwrap();
+        let as_al: Option<f32> = sam.calculate_base_score().unwrap();
         assert!((as_al.unwrap() - 0.8333).abs() < 0.001);
 
         // Accuracy -> (12 - 2) / 12 = 83.33%

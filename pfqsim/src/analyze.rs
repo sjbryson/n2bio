@@ -206,7 +206,7 @@ fn evaluate_and_accumulate_pair(
         if let Some(val) = record.calculate_alignment_length() {
             target_pool.align_length.increment(val as f64);
         }
-        if let Some(val) = record.calculate_as_al() {
+        if let Some(val) = record.calculate_base_score() {
             target_pool.as_al.increment(val as f64);
         }
         if let Some(val) = record.calculate_alignment_proportion() {

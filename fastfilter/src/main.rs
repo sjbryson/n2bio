@@ -79,7 +79,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if args.max_al.is_some_and(|max: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val <= max)) {
         return true;
     }
-    if args.max_sl.is_some_and(|max: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val <= max)) {
+    if args.max_sl.is_some_and(|max: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val <= max)) {
         return true;
     }
     if args.max_mq.is_some_and(|max: u32| sam.mapq() <= max) {

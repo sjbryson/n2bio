@@ -200,3 +200,173 @@ impl Histogram {
         Some((min_obs, max_obs))
     }
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper epsilon for comparing floating-point results
+    const EPSILON: f64 = 1e-6;
+
+    #[test]
+    fn test_new_histogram_initialization() {
+        let hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        assert_eq!(hist.min_val, 0.0);
+        assert_eq!(hist.max_val, 10.0);
+        assert_eq!(hist.bin_width, 2.0);
+        // ceil((10 - 0) / 2) + 1 = 6 bins
+        assert_eq!(hist.counts.len(), 6);
+        assert_eq!(hist.total_count(), 0);
+        assert!(hist.cdf.is_empty());
+    }
+
+    #[test]
+    fn test_increment_and_clamping() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        
+        // Exact midpoints/boundaries
+        hist.increment(0.0);  // bin 0
+        hist.increment(2.1);  // bin 1
+        hist.increment(2.2);  // bin 1
+        
+        // Out-of-bounds clamping
+        hist.increment(-5.0); // Clamped to 0.0 (bin 0)
+        hist.increment(15.0); // Clamped to 10.0 (bin 5)
+
+        assert_eq!(hist.counts[0], 2);
+        assert_eq!(hist.counts[1], 2);
+        assert_eq!(hist.counts[5], 1);
+        assert_eq!(hist.total_count(), 5);
+    }
+
+    #[test]
+    fn test_trim_active_and_empty() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 1.0);
+        hist.increment(2.0);
+        hist.increment(4.0);
+
+        hist.trim();
+        // Last active index is at value 4.0 (index 4)
+        assert_eq!(hist.counts.len(), 5);
+        assert_eq!(hist.max_val, 4.0);
+
+        // Test collapse on completely empty histogram
+        let mut empty_hist: Histogram = Histogram::new(0.0, 10.0, 1.0);
+        empty_hist.trim();
+        assert_eq!(empty_hist.counts.len(), 1);
+        assert_eq!(empty_hist.max_val, 0.0);
+    }
+
+    #[test]
+    fn test_cdf_compilation_and_sampling() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        hist.increment(0.0); // bin 0 (weight 1)
+        hist.increment(4.0); // bin 2 (weight 3)
+        hist.increment(4.0);
+        hist.increment(4.0);
+
+        hist.compile_cdf();
+        assert_eq!(hist.cdf, vec![0.25, 0.25, 1.0, 1.0, 1.0, 1.0]);
+
+        // Sampling boundary conditions
+        assert_eq!(hist.sample(0.0), 0.0);  // First bin
+        assert_eq!(hist.sample(0.20), 0.0); // Bin 0
+        assert_eq!(hist.sample(0.26), 4.0); // Bin 2
+        assert_eq!(hist.sample(1.00), 4.0); // Clamped to highest active bin index
+    }
+
+    #[test]
+    fn test_mean_mode_observed_range() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        
+        // bin_index = round((val - min) / width)
+        // val = 0.0 -> (0.0/2.0).round() -> bin 0 (midpoint 1.0)
+        // val = 4.0 -> (4.0/2.0).round() -> bin 2 (midpoint 5.0)
+        hist.increment(0.0); // 1 count in bin 0 (midpoint 1.0)
+        hist.increment(4.0); // 3 counts in bin 2 (midpoint 5.0)
+        hist.increment(4.0);
+        hist.increment(4.0);
+
+        // Mean = (1 * 1.0 + 3 * 5.0) / 4 = 16.0 / 4 = 4.0
+        assert_eq!(hist.mean(), Some(4.0));
+
+        // Mode = Midpoint of highest count bin (bin 2 -> 5.0)
+        assert_eq!(hist.mode(), Some(5.0));
+
+        // Observed range = bin 0 start (0.0) to bin 2 end (6.0)
+        assert_eq!(hist.observed_range(), Some((0.0, 6.0)));
+    }
+
+    #[test]
+    fn test_percentile_and_median() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 1.0);
+        
+        // val = 0.0 -> (0.0/1.0).round() -> bin 0 (range 0.0 to 1.0)
+        for _ in 0..10 {
+            hist.increment(0.0);
+        }
+
+        // 50th percentile (Median) target_rank = 5.0
+        // Interpolation in bin 0: 0.0 + (5.0 / 10.0) * 1.0 = 0.5
+        let median = hist.median().unwrap();
+        assert!((median - 0.5).abs() < EPSILON);
+
+        // Out of range percentiles return None
+        assert_eq!(hist.percentile(-1.0), None);
+        assert_eq!(hist.percentile(101.0), None);
+    }
+
+    #[test]
+    fn test_population_and_sample_stdev() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        // Midpoints: bin 0 -> 1.0, bin 2 -> 5.0
+        hist.increment(1.0);
+        hist.increment(5.0);
+
+        // Mean = 3.0
+        // Squared diffs = (1-3)^2 + (5-3)^2 = 4 + 4 = 8
+        // Population stdev = sqrt(8 / 2) = sqrt(4) = 2.0
+        // Sample stdev     = sqrt(8 / (2 - 1)) = sqrt(8) ≈ 2.828427
+        assert!((hist.stdev().unwrap() - 2.0).abs() < EPSILON);
+        assert!((hist.sample_stdev().unwrap() - 8.0f64.sqrt()).abs() < EPSILON);
+
+        // Sample stdev returns None for < 2 observations
+        let mut single_item_hist: Histogram = Histogram::new(0.0, 10.0, 1.0);
+        single_item_hist.increment(1.0);
+        assert_eq!(single_item_hist.sample_stdev(), None);
+        assert_ne!(single_item_hist.stdev(), None); // Population stdev works for 1 item
+    }
+
+    #[test]
+    fn test_serde_skips_cdf() {
+        let mut hist: Histogram = Histogram::new(0.0, 10.0, 2.0);
+        hist.increment(2.0);
+        hist.compile_cdf();
+
+        let json: String = serde_json::to_string(&hist).expect("Serialization failed");
+        
+        // Ensure "cdf" is omitted from JSON payload
+        assert!(!json.contains("cdf"));
+
+        let deserialized: Histogram = serde_json::from_str(&json).expect("Deserialization failed");
+        assert!(deserialized.cdf.is_empty());
+        assert_eq!(deserialized.total_count(), 1);
+    }
+
+    #[test]
+    fn test_empty_histogram_stat_fallbacks() {
+        let hist: Histogram = Histogram::new(0.0, 10.0, 1.0);
+        
+        assert_eq!(hist.mean(), None);
+        assert_eq!(hist.median(), None);
+        assert_eq!(hist.mode(), None);
+        assert_eq!(hist.stdev(), None);
+        assert_eq!(hist.sample_stdev(), None);
+        assert_eq!(hist.observed_range(), None);
+        assert_eq!(hist.sample(0.5), 0.0); // Defaults to min_val
+    }
+}

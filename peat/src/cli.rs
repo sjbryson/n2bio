@@ -4,6 +4,7 @@
 #![allow(unused)]
 
 use clap::{ Args, Parser, Subcommand };
+use std::path::PathBuf;
 
 // ============================================================================
 // Subcommands
@@ -112,61 +113,23 @@ pub(crate) struct FilterArgs {
 // Coverage Args
 // ============================================================================
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub(crate) struct CoverageArgs {
     
-    /// Path to the JSON model report -> created by pfqsim model
-    #[arg(short = 'm', long)]
-    pub model: String,
-
-    /// Path to the genome fasta file to generate reads from
-    #[arg(short = 'f', long)]
-    pub fasta: String,
-
-    /// Boolean value: circularize genome before generating reads
-    #[arg(short = 'c', long, default_value_t = false)]
-    pub circular: bool,
-
-    /// Float value for random substitution rate to apply to simulated reads (range: 0.0 - 1.0)
-    #[arg(short = 's', long, default_value_t = 0.0)]
-    pub sub_rate: f64,
-
-    /// Float value for random insertion and deletion rate to apply to simulated reads (range: 0.0 - 1.0)
-    #[arg(short = 'i', long, default_value_t = 0.0)]
-    pub indel_rate: f64,
-
-    /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
-    #[arg(short = 'n', long)]
-    pub num_reads: usize,
-
-    /// Read length to generate
-    #[arg(short = 'l', long, default_value_t = 150)]
-    pub read_length: usize,
-
-    /// Boolean value: Vary read lengths based on model
-    #[arg(long, default_value_t = false)]
-    pub vary_lengths: bool,
-
-    /// Prefix for output fastq.gz files (e.g. {prefix}.r1.fq.gz)
-    /// and for read identifiers (e.g. @{prefix}:{keyword}:Accession::Read Num)
-    #[arg(short = 'p', long)]
-    pub prefix: String,
-
-    /// Additional keyword to add to read identifiers
-    /// for use in query-target mapping (e.g. @{prefix}:{keyword}:Accession::Read Num)
-    #[arg(short = 'k', long)]
-    pub keyword: String,
-
-    /// Number of worker threads
-    #[arg(short = 't', long)]
+    /// Number of worker threads for parsing
+    #[arg(short = 't', long, default_value_t = 4)]
     pub threads: usize,
 
-    #[arg(skip)]
-    pub append_path: Option<String>,
+    /// Name of the run/sample for the JSON report -> creates {report}.json
+    #[arg(short = 'r', long, required = true)]
+    pub report: String,
 
-    #[arg(skip)]
-    pub append_mode: bool,
+     /// Optional path to an SQLite taxonomy database (see vref2db)
+    #[arg(long)]
+    pub db: Option<String>,
 
+    #[command(flatten)]
+    pub thresholds: ThresholdMetrics
 }
 
 // ============================================================================
@@ -176,33 +139,29 @@ pub(crate) struct CoverageArgs {
 #[derive(Args)]
 pub(crate) struct BamRepArgs {
     
-    /// Path to a TSV config file 
-    #[arg(short = 'c', long)]
-    pub config: String,
+    /// Input name-sorted BAM file
+    #[arg(short = 'b', long)]
+    pub bam: PathBuf,
 
-    /// Path to the JSON model report -> created by pfqsim model
-    #[arg(short = 'm', long)]
-    pub model: String,
+    /// Report file prefix - creates {report}.json and optional {report}.html
+    #[arg(short = 'r', long)]
+    pub report: PathBuf,
 
-    /// Prefix for the manifest tsv and both simulated reads (R1 & R2) files 
-    #[arg(short = 'p', long)]
-    pub prefix: String,
+    /// Generate html plots
+    #[arg(long)]
+    pub html: bool,
 
-    /// Integer value for number of paired reads to create (1 = 1 R1.fq.gz + 1 R2.fq.gz)
-    #[arg(short = 'n', long)]
-    pub total_reads: usize,
+    /// Minimum MAPQ score for insert size calculation
+    #[arg(short = 'q', long, default_value_t = 40)]
+    pub min_mapq: usize,
 
-    /// Read length to generate
+    /// Max insert size to use for summary stats calculation
+    #[arg(short = 'i', long, default_value_t = 1000)]
+    pub max_ins: usize,
+
+    /// Max read length to use
     #[arg(short = 'l', long, default_value_t = 150)]
-    pub read_length: usize,
-
-    /// Boolean value: Vary read lengths based on model
-    #[arg(long, default_value_t = false)]
-    pub vary_lengths: bool,
-
-    /// Number of worker threads
-    #[arg(short = 't', long)]
-    pub threads: usize,
+    pub max_len: usize,
 }
 
 // ============================================================================

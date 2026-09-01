@@ -37,7 +37,7 @@ pub(crate) fn lowpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds: 
     if args.align_length.is_some_and(|max: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val > max)) {
         return false;
     }
-    if args.base_score.is_some_and(|max: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val > max)) {
+    if args.base_score.is_some_and(|max: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val > max)) {
         return false;
     }
     if args.mapq.is_some_and(|max: u32| sam.mapq() > max) {
@@ -70,7 +70,7 @@ pub(crate) fn highpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds:
     if args.align_length.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val < min)) {
         return false;
     }
-    if args.base_score.is_some_and(|min: f32| sam.calculate_as_al().ok().flatten().is_some_and(|val: f32| val < min)) {
+    if args.base_score.is_some_and(|min: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val < min)) {
         return false;
     }
     if args.mapq.is_some_and(|min: u32| sam.mapq() < min) {
