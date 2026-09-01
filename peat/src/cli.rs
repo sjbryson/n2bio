@@ -3,7 +3,7 @@
 
 #![allow(unused)]
 
-use clap::{ Args, Parser, Subcommand };
+use clap::{ Args, Parser, Subcommand, ValueEnum };
 use std::path::PathBuf;
 
 // ============================================================================
@@ -33,7 +33,7 @@ pub(crate) enum Commands {
 // Threshold Mode
 // ============================================================================
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug)]
 pub(crate) enum ThresholdMode {
     /// Low Pass: process SAM records that are below defined thresholds
     #[value(name = "lowpass")]
@@ -171,15 +171,11 @@ pub(crate) struct BamRepArgs {
 #[derive(Parser, Debug, Clone)]
 pub(crate) struct BinReadsArgs {
     
-    /// Path to a TSV config file 
-    #[arg(short = 'c', long)]
-    pub config: String,
-
     /// Path to an input BAM file to evaluate
     #[arg(short = 'b', long)]
     pub bam: String,
 
-    /// Path to a TSV mapping file: reference id --> mapping-mode(id, keyword, or accession)
+    /// Path to a TSV mapping file: referenc_ id --> bin_id
     #[arg(short = 'r', long = "reference-map")]
     pub reference_map: String,
 }
