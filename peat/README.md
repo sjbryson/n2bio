@@ -1,6 +1,6 @@
 
 
-<p style="text-align:center"><img width="200" alt="peat-logo" src="./assets/peat-logo.png" /></p>
+<p style="text-align:center"><img width="200" alt="peat-logo" src="../assets/peat-logo.png" /></p>
 
 **<p style="text-align: center"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</p>**
 
