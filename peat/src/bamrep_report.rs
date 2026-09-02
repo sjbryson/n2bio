@@ -202,7 +202,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
         </div>
         <div class="slider-row">
             <label>Threshold:</label>
-            <input type="range" id="as_al_slider">
+            <input type="range" id="base_score_slider">
         </div>
 
         <div class="divider">Alignment Proportions (AP)</div>
@@ -226,7 +226,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
         </div>
         <div class="slider-row">
             <label>Threshold:</label>
-            <input type="range" id="align_accuracy_slider">
+            <input type="range" id="align_identity_slider">
         </div>
     </div>
 
