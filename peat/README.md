@@ -20,7 +20,7 @@ Options:
   -h, --help     Print help
   -V, --version  Print version
   ```
-
+---
 #### peat filter:
 ```
 Usage: peat filter [OPTIONS] --prefix <PREFIX> --report <REPORT> --filter_mode <FILTER_MODE>
@@ -70,7 +70,7 @@ Options:
   -h, --help
           Print help (see a summary with '-h')
 ```
-
+---
 #### peat coverage:
 
 ```
@@ -88,7 +88,7 @@ Options:
       --mapq <MAPQ>                  Optional: Max MAPQ score - sam.mapq()
   -h, --help                         Print help
 ```
-
+---
 #### peat bam-rep:
 
 ```
@@ -103,7 +103,7 @@ Options:
   -l, --max-len <MAX_LEN>    Max read length to use [default: 150]
   -h, --help                 Print help
   ```
-
+---
 #### peat bin-reads: Under development
 
 ```
@@ -114,8 +114,9 @@ Options:
   -r, --reference-map <REFERENCE_MAP>  Path to a TSV mapping file: referenc_ id --> bin_id
   -h, --help                           Print help
 ```
-
+---
 ## Examples - 
 
-
+---
 ## Roadmap - 
+---
