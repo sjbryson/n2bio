@@ -129,7 +129,7 @@ This approach is useful in pipelines like host read filtering, eliminating some 
 
 ```
 minimap2 -ax sr --eqx --secondary=no -t <threads> <input_mmi> <r1.fq.gz> <r2.fq.gz> | \
-peat filter -t <threads> --filter_mode lowpass --prefix <fq prefix> --report <json report>
+peat filter -t <threads> --filter_mode lowpass --prefix <fq prefix> --report <json report> \
 --AS <ALIGN_SCORE> --AL <ALIGN_LENGTH> --BS <BASE_SCORE> --AP <ALIGN_PROP> --AI <ALIGN_IDENT> --MQ <MAPQ>
 ```
 
