@@ -296,7 +296,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
             
             const min = r1_data.histogram.min_val;
             const bin_width = r1_data.histogram.bin_width;
-            const max = min + (r1_data.histogram.counts.length * bin_width);
+            const max = r1_data.histogram.max_val;
 
             // Configure slider dynamically based on the bin configuration
             slider.min = min;

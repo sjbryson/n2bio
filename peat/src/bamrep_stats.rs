@@ -112,8 +112,9 @@ impl StatSummary {
         // Drop empty trailing bins before sending to JSON
         hist.trim();
 
-        let (min, max) = hist.observed_range().unwrap_or((hist.min_val, hist.max_val));
-
+        let (min, mut max) = hist.observed_range().unwrap_or((hist.min_val, hist.max_val));
+        max -= hist.bin_width;
+        
         StatSummary {
             count: hist.total_count() as f64,
             mean: hist.mean().unwrap_or(0.0),

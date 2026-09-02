@@ -17,7 +17,6 @@ use crate::bamrep_stats::{ GlobalStats, StatSummary, StatsAccumulator, ReportDat
 use crate::cli::BamRepArgs;
 
 
-
 pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
     
     // Setup BamReader
