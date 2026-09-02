@@ -198,7 +198,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
             Only scores >= 0 are plotted. The maximum value is 2.
         </p>
         <div class="grid-row">
-            <div id="r1_as_al"></div> {table_base_score} <div id="r2_as_al"></div>
+            <div id="r1_base_score"></div> {table_base_score} <div id="r2_base_score"></div>
         </div>
         <div class="slider-row">
             <label>Threshold:</label>
@@ -217,12 +217,12 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
             <input type="range" id="align_proportion_slider">
         </div>
 
-        <div class="divider">Alignment Percent Identity (PI)</div>
+        <div class="divider">Alignment Identity (AI)</div>
         <p class="section-desc">
-            This is the record's number of matches (sam/bam tag "NM") divided by the Alignment Length (100 * NM/AL).
+            This percentage is the record's number of matches (sam/bam tag "NM") divided by the Alignment Length (100 * NM/AL).
         </p>
         <div class="grid-row">
-            <div id="r1_align_accuracy"></div> {table_align_identity} <div id="r2_align_accuracy"></div>
+            <div id="r1_align_identity"></div> {table_align_identity} <div id="r2_align_identity"></div>
         </div>
         <div class="slider-row">
             <label>Threshold:</label>
@@ -275,16 +275,16 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
         draw('r2_align_length', 'r2_align_length', 'R2 Alignment Lengths (AL)');
 
         // Draw AS per Base
-        draw('r1_as_al', 'r1_as_al', 'R1 AS per Base');
-        draw('r2_as_al', 'r2_as_al', 'R2 AS per Base');
+        draw('r1_base_score', 'r1_base_score', 'R1 AS per Base');
+        draw('r2_base_score', 'r2_base_score', 'R2 AS per Base');
 
         // Draw Align Proportion
         draw('r1_align_proportion', 'r1_align_proportion', 'R1 Alignment Proportions (AP)');
         draw('r2_align_proportion', 'r2_align_proportion', 'R2 Alignment Proportions (AP)');
 
         // Draw Align Accuracy (PI)
-        draw('r1_align_accuracy', 'r1_align_accuracy', 'R1 Alignment Percent Identity (PI)');
-        draw('r2_align_accuracy', 'r2_align_accuracy', 'R2 Alignment Percent Identity (PI)');
+        draw('r1_align_identity', 'r1_align_identity', 'R1 Alignment Identity (AI)');
+        draw('r2_align_identity', 'r2_align_identity', 'R2 Alignment Identity (AI)');
 
         // Interactive Threshold Logic
         function setupSlider(base_name, r1_name, r2_name) {{
@@ -347,7 +347,7 @@ pub fn generate_html_report(report_data: &ReportData, html_path: &PathBuf, repor
         setupSlider('align_length', 'r1_align_length', 'r2_align_length');
         setupSlider('base_score', 'r1_base_score', 'r2_base_score');
         setupSlider('align_proportion', 'r1_align_proportion', 'r2_align_proportion');
-        setupSlider('align_accuracy', 'r1_align_accuracy', 'r2_align_accuracy');
+        setupSlider('align_identity', 'r1_align_identity', 'r2_align_identity');
     </script>
 </body>
 </html>
