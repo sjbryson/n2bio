@@ -1,6 +1,6 @@
 <img width="1200" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
 
-## n2bio - a rust workspace for building bioinformatics cli tools
+## n2bio - a rust workspace and library for building bioinformatics cli tools
 
 *I created this repo as part of my rust learning journey - building cli tools that I use in my own research & using LLM's along the way.*
 
@@ -24,18 +24,19 @@ cargo build --release
 
 ---
 
-### Modules:
+### Library:
 
-**n2core/** - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
-  - sam.rs      - read and work with SAM formatted alignment records.
-  - bam.rs      - read and work with BAM formatted alignment records.
-  - fastq.rs    - read and write fastq files.
-  - fasta.rs    - read and write fasta files.
-  - sequence.rs - traits to work with DNA sequence data.
-  - kmer.rs     - traits to work with kmers.
-  - hist.rs     - structs and functions to work with distributions and associated stats.
-  - readers.rs  - boilerplate code for reading files and stdin.
-  - writers.rs  - boilerplate code for writing data to files and stdout.
+**n2bio/** - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
+  - sam.rs      - Read and work with SAM formatted alignment records.
+  - bam.rs      - Read and work with BAM formatted alignment records.
+  - fastq.rs    - Read and write fastq files.
+  - fasta.rs    - Read and write fasta files.
+  - sequence.rs - Traits to work with DNA sequence data.
+  - kmer.rs     - Traits to work with kmers.
+  - hist.rs     - Structs and functions to work with distributions and associated stats.
+  - metadata.rs - Structs and functions to work with common metadata files (tsv, json, jsonl).
+  - readers.rs  - Boilerplate code for reading files and stdin.
+  - writers.rs  - Boilerplate code for writing data to files and stdout.
 
 ---
 
@@ -43,11 +44,15 @@ cargo build --release
 
 <p style="text-align:center"><img width="200" alt="peat-logo" src="./assets/peat-logo.png" /></p>
 
-**<p style="text-align: center"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</p>**
+[**<p style="text-align: center"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</p>**](./peat)
 
-- This will be the new home for fastfilter, fastcov, & bamrep -> peat filter, peat coverage, and peat bamrep respectively.
-- peat filter will enable --lowpass and --highpass behaviors + an interleaved fastq stdout option.
+#### There are several subcommands for working with paired-end alignment records:
 
+- **peat filter** - Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz).
+- **peat coverage** - Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header
+- **peat bam-rep** - Read a name sorted bam file and generate an interactive report
+- **peat bin-reads** - ToDo: Parse SAM records from stdin or BAM and bin read pairs for each target
+  
 ---
 
 **fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
