@@ -1,6 +1,5 @@
 //! n2bio/src/metadata.rs
-//! Core structs and traits for incorporating metadata into cli reports
-//! 
+//! Core structs and traits for incorporating metadata into reports
 
 use csv::ReaderBuilder;
 use serde_json::{Map, Number, Value};

@@ -2,10 +2,11 @@
 
 [package]
 name = "n2bio"
-version.workspace = true
-authors.workspace = true
-description.workspace = true
-edition.workspace = true
+version = "0.1.0"
+authors = ["Samuel Bryson <sjbryson@ucla.edu>"]
+description = "A rust library for bioinformatics app development"
+edition = "2024"
+license = "MIT"
 
 [dependencies]
 rayon = "1.10"
@@ -14,7 +15,6 @@ gzp = "0.11"
 bzip2 = "0.4"
 rustc-hash = "1.1"
 byteorder = "1.5"
-petgraph = { version = "0.8", features = ["serde-1"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "1.3"

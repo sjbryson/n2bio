@@ -220,7 +220,7 @@ impl BamStats for BamRecord {
                             return if vtype == b'i' {
                                 Some(i32::from_le_bytes(bytes))
                             } else {
-                                // Note: Converting u32 to i32. Safe for typical tags like AS/NM.
+                                // Converting u32 to i32.
                                 Some(u32::from_le_bytes(bytes) as i32) 
                             };
                         }

@@ -31,8 +31,8 @@ pub enum WriterType {
 
 
 impl WriterType {
-    /// Automatically detects the correct writer type based on the 
-    /// file extension. Uses `to_stdout` if the path is `-`. Defaults to single-threaded compression.
+    /// Automatically detects the correct writer type based on the file extension. 
+    /// Uses `to_stdout` if the path is `-`. Defaults to single-threaded compression.
     pub fn create(path: &str) -> io::Result<Self> {
         if path == "-" {
             Ok(Self::to_stdout())

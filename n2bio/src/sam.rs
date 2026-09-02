@@ -145,7 +145,7 @@ impl <T: SamFields>CigarString for T {
 
 /// Trait for some custom alignment stats
 pub trait AlignmentStats: CigarString + SamTags {
-    fn calculate_base_score(&self) -> Result<Option<f32>, SamError>;                 // AS (alignment score) / AL (alignment length)
+    fn calculate_base_score(&self) -> Result<Option<f32>, SamError>;            // AS (alignment score) / AL (alignment length)
     fn calculate_alignment_length(&self) -> Result<Option<u32>, SamError>;      // from cigar string
     fn calculate_alignment_proportion(&self) -> Result<Option<f32>, SamError>;  // alignment length/read length
     fn calculate_alignment_identity(&self) -> Result<Option<f32>, SamError>;    // (alignment length - NM)/alignment length
@@ -154,7 +154,7 @@ pub trait AlignmentStats: CigarString + SamTags {
 /// Blanket AlignmentStats implementation for anything that implements SamFields, SamTags & CigarString.
 impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
     
-    /// Calculate base score AS/AL (Alignment Score divided by Alignment Length)
+    /// Calculate base score BS = AS/AL (Alignment Score divided by Alignment Length)
     fn calculate_base_score(&self) -> Result<Option<f32>, SamError> {
         let Some((align_len, _, _, _)) = self.parse_cigar()? else { return Ok(None) };
         let Some(as_score) = self.get_int_tag("AS") else { return Ok(None) };
@@ -197,7 +197,7 @@ impl <T: SamFields + SamTags + CigarString>AlignmentStats for T {
 }
 
 // ============================================================================
-// Struct for Borrowed SAM record: SamStr (maybe change to BorrowedSam)
+// Struct for Borrowed SAM record: SamStr
 // ============================================================================
 
 /// Struct representing a single SAM alignment record in a zero-allocation str format
@@ -268,7 +268,7 @@ impl<'a> SamTags for SamStr<'a> {
 }
 
 // ============================================================================
-// Struct for Owned SAM record: SamRecord (maybe change to OwnedSam)
+// Struct for Owned SAM record: SamRecord
 // ============================================================================
 
 /// Struct representing a fully parsed, owned SAM alignment record.

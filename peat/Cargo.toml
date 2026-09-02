@@ -2,11 +2,11 @@
 
 [package]
 name = "peat"
-version.workspace = true
-authors.workspace = true
-description.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.1.0"
+authors = ["Samuel Bryson <sjbryson@ucla.edu>"]
+description = "A cli tool for working with paired-end alignments in sam or bam format."
+edition = "2024"
+license = "MIT"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

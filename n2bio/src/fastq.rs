@@ -137,7 +137,7 @@ impl<W: Write> FastqWriter<W> {
         Self { writer }
     }
 
-    /// Writes a record using raw bytes to bypass `std::fmt` overhead.
+    /// Writes a record using raw bytes.
     pub fn write_record<T: FastqFormatter>(&mut self, rec: &FastqRecord<T>) -> io::Result<()> {
         self.writer.write_all(b"@")?;
         self.writer.write_all(T::format_id(&rec.id).as_bytes())?;
@@ -311,7 +311,7 @@ impl<R: BufRead, T: FastqFormatter> Iterator for FastqReader<R, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut id_line = String::new();
         
-        // 1. Read the ID line.
+        // Read the ID line.
         match self.reader.read_line(&mut id_line) {
             Ok(0) => return None, // Clean EOF
             Ok(_) => {},
@@ -322,17 +322,17 @@ impl<R: BufRead, T: FastqFormatter> Iterator for FastqReader<R, T> {
         let mut plus: String = String::new();
         let mut qual: String = String::new();
 
-        // 2. Read the next 3 lines. If any fail, it's an unexpected EOF/truncation.
+        // Read the next 3 lines. If any fail, it's an unexpected EOF/truncation.
         if let Err(e) = self.reader.read_line(&mut seq) { return Some(Err(e)); }
         if let Err(e) = self.reader.read_line(&mut plus) { return Some(Err(e)); }
         if let Err(e) = self.reader.read_line(&mut qual) { return Some(Err(e)); }
 
-        // 3. Clean up the strings.
+        // Clean up the strings.
         let id:   String = id_line.trim_start_matches('@').trim_end().to_string();
         let seq:  String = seq.trim_end().to_string();
         let qual: String = qual.trim_end().to_string();
 
-        // 4. Validate that the record wasn't truncated in the middle of a file.
+        // Validate that the record wasn't truncated in the middle of a file.
         if seq.is_empty() || plus.is_empty() || qual.is_empty() {
             return Some(Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
@@ -340,7 +340,7 @@ impl<R: BufRead, T: FastqFormatter> Iterator for FastqReader<R, T> {
             )));
         }
 
-        // 5. Return the typed FastqRecord.
+        // Return the typed FastqRecord.
         Some(Ok(FastqRecord::new(id, seq, qual)))
     }
 }
@@ -528,14 +528,11 @@ pub struct ShardedMateMap {
 
 impl ShardedMateMap {
     /// Creates a new ShardedMateMap. 
-    /// A good rule of thumb is to set num_shards to at least 4x to 8x 
-    /// the number of threads you plan to run. If you are using a 16-core machine, 
-    /// 64 or 128 shards virtually guarantee that two threads will almost never 
-    /// try to lock the exact same shard at the same time.
+    /// A good rule of thumb is to set num_shards to 4 - 8x 
+    /// the number of threads you plan to run.
     pub fn new(num_shards: usize) -> Self {
         let mut shards: Vec<Mutex<HashMap<String, PairedRead, std::hash::BuildHasherDefault<FxHasher>>>> = Vec::with_capacity(num_shards);
         for _ in 0..num_shards {
-            // FxHashMap::default() uses the fast FxHasher automatically
             shards.push(Mutex::new(FxHashMap::default()));
         }
         
@@ -572,14 +569,14 @@ impl ShardedMateMap {
             };
             Some(pair)
         } else {
-            // 3. Only allocate a String to insert it.
+            // 3. Allocate a String to insert it.
             let qname_owned: String = rec.id().to_string();
             shard.insert(qname_owned, rec);
             None
         }
     }
 
-    /// Safely aggregates the total orphan count across all shards.
+    /// Aggregate the total orphan count across all shards.
     pub fn orphan_count(&self) -> usize {
         self.shards
             .iter()

@@ -63,8 +63,7 @@ impl<R: BufRead> FastaReader<R> {
 }
 
 impl FastaReader<ReaderType> {
-    /// Automatically detects file type (plain, gz, bz2, stdin) 
-    /// based on the path extension.
+    /// Automatically detects file type (plain, gz, bz2, stdin) based on the path extension.
     pub fn open(path: &str) -> io::Result<Self> {
         Ok(Self::new(ReaderType::open(path)?))
     }
@@ -86,7 +85,7 @@ impl<R: BufRead> Iterator for FastaReader<R> {
     type Item = io::Result<FastaRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // 1. Determine the header for the current record
+        // Determine the header for the current record
         let header_line: String = match self.next_header.take() {
             Some(h) => h,
             None => {
@@ -106,16 +105,16 @@ impl<R: BufRead> Iterator for FastaReader<R> {
             }
         };
 
-        // 2. Parse the ID and Description from the header
+        // Parse the ID and Description from the header
         let (id, desc) = parse_fasta_header(&header_line);
         
-        // 3. Read the sequence lines until we hit the next '>' or EOF
+        // Read the sequence lines until the next '>' or EOF
         let mut seq: String = String::with_capacity(2048);
         
         loop {
             self.line_buffer.clear();
             match self.reader.read_line(&mut self.line_buffer) {
-                Ok(0) => break, // EOF, return what we have
+                Ok(0) => break, // EOF
                 Ok(_) => {
                     let trimmed: &str = self.line_buffer.trim_end();
                     if trimmed.is_empty() {
@@ -184,8 +183,7 @@ impl<W: Write> FastaWriter<W> {
 }
 
 impl FastaWriter<WriterType> {
-    /// Automatically detects file type (stdout, plain, gz, bz2) 
-    /// based on the path extension.
+    /// Automatically detects file type (stdout, plain, gz, bz2) based on the path extension.
     pub fn create(path: &str) -> io::Result<Self> {
         Ok(Self::new(WriterType::create(path)?))
     }
