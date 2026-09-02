@@ -117,6 +117,22 @@ Options:
 ---
 ## Examples - 
 
+#### peat filter
+
+Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to <prefix>_r1.fq.gz and <prefix>_r2.fq.gz. Summary stats are written to <report>.json. 
+
+Filter mode is set using the --filter_mode <FILTER_MODE> option.
+- lowpass - all read pairs that are unmapped or pass all defined maximum threshold values are retained.
+- highpass - all read pairs that are mapped and pass all defined minimum threshold values are retained.
+
+This approach is useful in pipelines like host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. 
+
+```
+minimap2 -ax sr --eqx --secondary=no -t <threads> <input_mmi> <r1.fq.gz> <r2.fq.gz> | \
+peat filter -t <threads> --filter_mode lowpass --prefix <fq prefix> --report <json report>
+--AS <ALIGN_SCORE> --AL <ALIGN_LENGTH> --BS <BASE_SCORE> --AP <ALIGN_PROP> --AI <ALIGN_IDENT> --MQ <MAPQ>
+```
+
 ---
 ## Roadmap - 
 ---
