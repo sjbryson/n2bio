@@ -19,13 +19,13 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
-    /// Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz)
+    /// Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz).
     Filter(FilterArgs),
-    /// Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header
+    /// Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header.
     Coverage(CoverageArgs),
-    /// Read a name sorted bam file and generate an interactive report
+    /// Read a name sorted bam file and generate an interactive report.
     BamRep(BamRepArgs),
-    /// ToDo: Parse SAM records from stdin and bin read pairs for each target
+    /// ToDo: Read a name sorted bam file and bin read pairs for each target.
     BinReads(BinReadsArgs),
 }
 

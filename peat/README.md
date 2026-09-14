@@ -13,7 +13,7 @@ Commands:
   filter     Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz)
   coverage   Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header
   bam-rep    Read a name sorted bam file and generate an interactive report
-  bin-reads  ToDo: Parse SAM records from stdin or BAM and bin read pairs for each target
+  bin-reads  ToDo: Read a name sorted bam file and bin read pairs for each target
   help       Print this message or the help of the given subcommand(s)
 
 Options:
@@ -107,11 +107,20 @@ Options:
 #### peat bin-reads: Under development
 
 ```
-Usage: peat bin-reads --bam <BAM> --reference-map <REFERENCE_MAP>
+Usage: peat bin-reads [OPTIONS] --bam <BAM> --output-dir <OUTPUT_DIR> --report <REPORT>
 
 Options:
   -b, --bam <BAM>                      Path to an input BAM file to evaluate
-  -r, --reference-map <REFERENCE_MAP>  Path to a TSV mapping file: referenc_ id --> bin_id
+  -m, --reference-map <REFERENCE_MAP>  Path to a TSV mapping file: referenc_ id --> bin_id
+  -o, --output-dir <OUTPUT_DIR>        Directory for output files (e.g. 'dir' -> dir/out.r1.fq.gz, dir/out.r2.fq.gz)
+  -r, --report <REPORT>                Report file prefix - creates {report}.json
+  -t, --threads <THREADS>              Number of worker threads for parsing and pairing [default: 4]
+      --align_score <ALIGN_SCORE>      Optional: Alignment Score - sam.get_int_tag("AS")
+      --align_length <ALIGN_LENGTH>    Optional: Alignment Lenth - sam.calculate_alignment_length()
+      --base_score <BASE_SCORE>        Optional: Per base alignment score (AS/AL = avg. align_score per covered base) - sam.calculate_as_al()
+      --align_prop <ALIGN_PROP>        Optional: Alignment Proportion - sam.calculate_alignment_proportion()
+      --align_ident <ALIGN_IDENT>      Optional: Alignment Percent Identity - sam.calculate_alignment_accuracy()
+      --mapq <MAPQ>                    Optional: Max MAPQ score - sam.mapq()
   -h, --help                           Print help
 ```
 ---
