@@ -139,9 +139,9 @@ fn evaluate_and_bin_pair(
         _ => return Ok(()), // Safeguard against malformed flags
     };
 
-    let pair = PairedFastqRecord { r1: rec_r1, r2: rec_r2 };
+    let pair: PairedFastqRecord = PairedFastqRecord { r1: rec_r1, r2: rec_r2 };
 
-    // 4. Route pair based on bin assignments
+    // Route pair based on bin assignments
     match (bin_r1, bin_r2) {
         (Some(b1), Some(b2)) if b1 == b2 => {
             stats.inc_concordant(b1);

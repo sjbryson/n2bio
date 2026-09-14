@@ -13,8 +13,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use std::io::Write;
 use std::collections::HashMap;
-use rusqlite::Connection;
+use std::path::Path;
 
+use n2bio::metadata::Metadata;
 use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
 
 use crate::cli::CoverageArgs;
@@ -229,29 +230,33 @@ pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
     for handle in worker_handles { handle.join().unwrap(); }
     let ref_map: HashMap<String, RefStats> = aggregator_handle.join().unwrap();
 
+    
+    // ============================================================================
+    // METADATA INITIALIZATION
+    // ============================================================================
+    // Load metadata file if provided (supports TSV, JSON, or JSONL based on file extension/args)
+    let metadata: Option<Metadata> = if let Some(ref meta_path_str) = args.metadata {
+    let key_col: &str = args.metadata_key.as_deref().unwrap_or("accession");
+    let meta_path: &Path = Path::new(meta_path_str);
+        
+        let meta: Metadata = match meta_path.extension().and_then(|s| s.to_str()) {
+            Some("tsv") | Some("txt") => Metadata::from_tsv(meta_path, key_col),
+            Some("json") => Metadata::from_json(meta_path, key_col),
+            Some("jsonl") | Some("ndjson") => Metadata::from_jsonl(meta_path, key_col),
+            _ => Metadata::from_tsv(meta_path, key_col), // Default fallback
+        }.expect("Failed to load metadata file");
+
+        Some(meta)
+    } else {
+        None
+    };
+    
     // ============================================================================
     // JSON EXPORT
     // ============================================================================
     let mut num_refs_primary: u32 = 0;
     let mut num_refs_secondary: u32 = 0;
-    let mut coverage_stats: Vec<serde_json::Value> = Vec::new();
-
-
-    // Setup SQLite Connection & Prepare Statement (if --db is provided)
-    let conn: Option<Connection> = args.db.as_ref().map(|db_path| {
-        rusqlite::Connection::open(db_path).expect("Failed to open SQLite database")
-    });
-
-    let mut stmt: Option<rusqlite::Statement<'_>> = conn.as_ref().map(|c| {
-        c.prepare("SELECT * FROM viral_taxonomy WHERE accession = ?")
-        .expect("Failed to prepare SQL statement")
-    });
-
-    // Array of ranks
-    let ranks: [&str; 8] = [
-        "realm", "kingdom", "phylum", "class", "order", "family","genus", "species"
-    ];
-    
+    let mut coverage_stats: Vec<serde_json::Value> = Vec::new(); 
 
     for (_, stats) in ref_map {
         if stats.num_primary   > 0 { num_refs_primary += 1; }
@@ -289,42 +294,12 @@ pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
         let k: f64   = ref_len_f64 / 1000.0;
         let rpk: f64 = stats.num_primary as f64 / k;
 
-        // Query the SQLite Database for the Accession
-        let lineage_json: serde_json::Value = if let Some(ref mut statement) = stmt {
-            // Query the DB.
-            let query_result: Result<serde_json::Value, rusqlite::Error> = statement.query_row([&stats.ref_name], |row| {
-                let mut map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
-
-                // Get the base taxonomy ID and name first
-                let base_tax_id: Option<i64> = row.get("tax_id").ok();
-                let base_name: Option<String> = row.get("name").ok();
-                if let (Some(id), Some(name)) = (base_tax_id, base_name) {
-                    map.insert("organism".to_string(), serde_json::json!({ "tax_id": id, "name": name }));
-                }
-
-                // Loop through the ranks
-                for rank in ranks.iter() {
-                    let id_col: String = format!("{}_id", rank);
-                    let name_col: String = format!("{}_name", rank);
-                    let id: Option<i64> = row.get(id_col.as_str()).ok();
-                    let name: Option<String> = row.get(name_col.as_str()).ok();
-
-                    // Only add the rank to JSON if both ID and Name exist in the row
-                    if let (Some(rank_id), Some(rank_name)) = (id, name) {
-                        map.insert(rank.to_string(), serde_json::json!({ "tax_id": rank_id, "name": rank_name }));
-                    }
-                }
-                
-                Ok(serde_json::Value::Object(map))
-            });
-
-        // If the query was successful, return it. Otherwise return null.
-            query_result.unwrap_or(serde_json::json!(null))
-        
-        } else {
-            // If --db was not provided (stmt is None), return null.
-            serde_json::json!(null)
-        };
+        // Retrieve metadata using reference name (accession)
+        let ref_metadata: serde_json::Value = metadata
+            .as_ref()
+            .and_then(|m| m.lookup(&stats.ref_name))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         // Helper to format the arrays as comma-separated Strings
         let vec_to_string = |v: &Vec<u32>| v.iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
@@ -349,8 +324,8 @@ pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
                     "average_coverage_primary"           : f64::trunc(primary_avg_coverage * 10000.0) / 10000.0,
                     "ref_length"                         : stats.ref_length,
                     "rpk"                                : f64::trunc(rpk * 10000.0) / 10000.0,
-                    "virus_lineage"                      : lineage_json,
-                    "x_coverage" : {
+                    "ref_metadata"                       : ref_metadata,
+                    "ref_coverage" : {
                         "primary_coverage"   : vec_to_string(&stats.primary_coverage),
                         "secondary_coverage" : vec_to_string(&stats.secondary_coverage),
                         "mismatch_coverage"  : vec_to_string(&stats.mismatch_coverage),

@@ -124,9 +124,13 @@ pub(crate) struct CoverageArgs {
     #[arg(short = 'r', long, required = true)]
     pub report: String,
 
-     /// Optional path to an SQLite taxonomy database (see vref2db)
-    #[arg(long)]
-    pub db: Option<String>,
+    /// Optional path to a metadata file
+    #[arg(short = 'm', long)]
+    pub metadata: Option<String>,
+
+    /// Optional metadata keyword
+    #[arg(short = 'k', long)]
+    pub metadata_key: Option<String>,
 
     #[command(flatten)]
     pub thresholds: ThresholdMetrics

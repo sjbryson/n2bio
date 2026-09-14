@@ -15,8 +15,6 @@ use n2bio::writers::WriterType;
 use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
 use crate::alignmentfilters::{ lowpass_samfilter, highpass_samfilter, threshold_args };
 
-
-
 pub(crate) fn run(args: FilterArgs) -> io::Result<()> {
 
     let start_time: Instant = Instant::now(); // Start the clock
