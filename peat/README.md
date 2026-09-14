@@ -79,7 +79,8 @@ Usage: peat coverage [OPTIONS] --report <REPORT>
 Options:
   -t, --threads <THREADS>            Number of worker threads for parsing [default: 4]
   -r, --report <REPORT>              Name of the run/sample for the JSON report -> creates {report}.json
-      --db <DB>                      Optional path to an SQLite taxonomy database (see vref2db)
+  -m, --metadata <METADATA>          Optional path to a metadata file
+  -k, --metadata-key <METADATA_KEY>  Optional metadata keyword
       --align_score <ALIGN_SCORE>    Optional: Alignment Score - sam.get_int_tag("AS")
       --align_length <ALIGN_LENGTH>  Optional: Alignment Lenth - sam.calculate_alignment_length()
       --base_score <BASE_SCORE>      Optional: Per base alignment score (AS/AL = avg. align_score per covered base) - sam.calculate_as_al()
