@@ -2,6 +2,8 @@
 //! 
 
 use n2bio::sam::{SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::bam::{ BamRecord, BamStats, BamFlags };
+
 use crate::cli::ThresholdMetrics;
 
 // ============================================================================
@@ -14,7 +16,7 @@ pub(crate) fn threshold_args(args: &ThresholdMetrics) -> bool {
     }
 
 /// Low pass filter logic - must be unmapped or pass all defined thresholds
-pub(crate) fn lowpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
+pub(crate) fn lowpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
     // Keep all unmapped reads
     if !sam.is_mapped() {
         return true;
@@ -47,7 +49,7 @@ pub(crate) fn lowpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds: 
 }
 
 /// Highpass filter logic - must be mapped or pass all defined thresholds
-pub(crate) fn highpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
+pub(crate) fn highpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
     // Check if read is mapped
     if !sam.is_mapped() {
         return false;
@@ -78,6 +80,37 @@ pub(crate) fn highpass_filter(sam: &SamStr, args: &ThresholdMetrics, thresholds:
     // If it is mapped and passed all of the specified min thresholds - return true
     true
 }
+
+
+pub(crate) fn highpass_bamfilter(record: &BamRecord, args: &ThresholdMetrics, thresholds: bool) -> bool {
+    if !record.is_mapped() {
+        return false;
+    }
+    if !thresholds {
+        return true;
+    }
+    if args.align_prop.is_some_and(|min| record.calculate_alignment_proportion().is_some_and(|val| val < min)) {
+        return false; 
+    }
+    if args.align_ident.is_some_and(|min| record.calculate_alignment_identity().is_some_and(|val| val < min)) {
+        return false;
+    }
+    if args.align_score.is_some_and(|min| record.get_int_tag(b"AS").is_some_and(|val| val < min)) {
+        return false;
+    }
+    if args.align_length.is_some_and(|min| record.calculate_alignment_length().is_some_and(|val| val < min)) {
+        return false;
+    }
+    if args.base_score.is_some_and(|min| record.calculate_base_score().is_some_and(|val| val < min)) {
+        return false;
+    }
+    if args.mapq.is_some_and(|min| u32::from(record.mapq) < min) {
+        return false;
+    }
+
+    true
+}
+
 
 // ============================================================================
 // Tests
@@ -125,7 +158,7 @@ mod tests {
         let thresholds: bool = threshold_args(&args);
 
         // Unmapped passes regardless of thresholds state
-        assert!(lowpass_filter(&sam, &args, thresholds));
+        assert!(lowpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -135,7 +168,7 @@ mod tests {
         let thresholds: bool = threshold_args(&args);
 
         // Mapped read with no active thresholds fails lowpass
-        assert!(!lowpass_filter(&sam, &args, thresholds));
+        assert!(!lowpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -146,7 +179,7 @@ mod tests {
         args.align_score = Some(150); // record AS is 100 <= 150
         let thresholds: bool = threshold_args(&args);
 
-        assert!(lowpass_filter(&sam, &args, thresholds));
+        assert!(lowpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -156,7 +189,7 @@ mod tests {
         args.mapq = Some(20);   // record is 30 > 20 (exceeds max)
         let thresholds: bool = threshold_args(&args);
 
-        assert!(!lowpass_filter(&sam, &args, thresholds));
+        assert!(!lowpass_samfilter(&sam, &args, thresholds));
     }
 
     // --- Highpass Filter Tests ---
@@ -169,7 +202,7 @@ mod tests {
         let thresholds = threshold_args(&args);
 
         // Highpass rejects all unmapped reads upfront
-        assert!(!highpass_filter(&sam, &args, thresholds));
+        assert!(!highpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -179,7 +212,7 @@ mod tests {
         let thresholds: bool = threshold_args(&args);
 
         // Mapped read with no defined thresholds passes highpass
-        assert!(highpass_filter(&sam, &args, thresholds));
+        assert!(highpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -190,7 +223,7 @@ mod tests {
         args.align_score = Some(50); // record AS is 100 >= 50
         let thresholds: bool = threshold_args(&args);
 
-        assert!(highpass_filter(&sam, &args, thresholds));
+        assert!(highpass_samfilter(&sam, &args, thresholds));
     }
 
     #[test]
@@ -200,6 +233,6 @@ mod tests {
         args.mapq = Some(40); // record is 30 < 40 (fails min requirement)
         let thresholds: bool = threshold_args(&args);
 
-        assert!(!highpass_filter(&sam, &args, thresholds));
+        assert!(!highpass_samfilter(&sam, &args, thresholds));
     }
 }

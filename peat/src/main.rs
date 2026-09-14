@@ -4,11 +4,14 @@
 mod cli;
 mod filter;
 mod coverage;
+mod alignmentfilters;
 mod bamrep;
-mod binreads;
-mod samfilters;
 mod bamrep_stats;
 mod bamrep_report;
+mod binreads;
+mod binreads_resolver;
+mod binreads_pooler;
+mod binreads_stats;
 
 use std::io;
 use clap::Parser;

@@ -13,7 +13,7 @@ use n2bio::fastq::{ShardedMateMap, PairedRead, PairedFastqWriter};
 use n2bio::writers::WriterType;
 
 use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
-use crate::samfilters::{ lowpass_filter, highpass_filter, threshold_args };
+use crate::alignmentfilters::{ lowpass_samfilter, highpass_samfilter, threshold_args };
 
 
 
@@ -24,8 +24,8 @@ pub(crate) fn run(args: FilterArgs) -> io::Result<()> {
     // Define filter function based on ThresholdMode (lowpass or highpass) and optional thresholds 
     let has_thresholds: bool = threshold_args(&args.thresholds);
     let sam_filter: fn(&SamStr<'_>, &ThresholdMetrics, bool) -> bool = match args.filter_mode {
-        ThresholdMode::LowPass => lowpass_filter,
-        ThresholdMode::HighPass => highpass_filter,
+        ThresholdMode::LowPass => lowpass_samfilter,
+        ThresholdMode::HighPass => highpass_samfilter,
     };
     
     // Initialize shared state & channels.

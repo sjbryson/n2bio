@@ -4,6 +4,7 @@ use byteorder::{ LittleEndian, ReadBytesExt };
 use std::io::{ self, Read, ErrorKind };
 use flate2::read::MultiGzDecoder;
 use crate::readers::ReaderType;
+use crate::sequence::DnaSequence;
 
 // BAM 16-character sequence alphabet (Index matches the 4-bit integer).
 // 0:=, 1:A, 2:C, 3:M, 4:G, 5:R, 6:S, 7:V, 8:T, 9:W, 10:Y, 11:H, 12:K, 13:D, 14:B, 15:N
@@ -112,6 +113,50 @@ impl BamRecord {
         }
 
         parsed
+    }
+
+    /// Resolves the reference sequence name using the BAM header.
+    /// Returns None if unmapped (ref_id < 0) or ref_id is out of bounds.
+    pub fn target_name<'a>(&self, header: &'a BamHeader) -> Option<&'a str> {
+        if self.ref_id < 0 {
+            return None;
+        }
+        header.references.get(self.ref_id as usize).map(|r| r.name.as_str())
+    }
+
+    /// Converts raw read name (null-terminated) into a String.
+    pub fn read_name_str(&self) -> String {
+        // Drop trailing null byte if present
+        let bytes = if self.read_name.ends_with(&[0]) {
+            &self.read_name[..self.read_name.len() - 1]
+        } else {
+            &self.read_name
+        };
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+
+    /// Converts raw Phred quality scores to Phred+33 ASCII bytes.
+    pub fn ascii_qualities(&self) -> Vec<u8> {
+        self.qual.iter().map(|&q| q + 33).collect()
+    }
+
+    /// Prep sequence and quality strings for FASTQ format.
+    /// Handles 4-bit decoding, Phred+33 conversion, and reverse-complementation if on reverse strand.
+    pub fn to_fastq_fields(&self) -> (String, String, String) {
+        let qname = self.read_name_str();
+        let mut seq_bytes = self.decoded_sequence();
+        let mut qual_bytes = self.ascii_qualities();
+
+        // If mapped to reverse strand, reverse complement sequence and reverse qualities
+        if self.is_revcomp() {
+            seq_bytes = seq_bytes.reverse_complement();
+            qual_bytes.reverse();
+        }
+
+        let seq = String::from_utf8_lossy(&seq_bytes).into_owned();
+        let qual = String::from_utf8_lossy(&qual_bytes).into_owned();
+
+        (qname, seq, qual)
     }
 }
 

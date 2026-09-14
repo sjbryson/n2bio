@@ -168,15 +168,30 @@ pub(crate) struct BamRepArgs {
 // BinReads Args
 // ============================================================================
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Args)]
 pub(crate) struct BinReadsArgs {
     
     /// Path to an input BAM file to evaluate
     #[arg(short = 'b', long)]
-    pub bam: String,
+    pub bam: PathBuf,
 
     /// Path to a TSV mapping file: referenc_ id --> bin_id
-    #[arg(short = 'r', long = "reference-map")]
-    pub reference_map: String,
+    #[arg(short = 'm', long = "reference-map")]
+    pub reference_map: Option<String>,
+
+    /// Directory for output files (e.g. 'dir' -> dir/out.r1.fq.gz, dir/out.r2.fq.gz)
+    #[arg(short = 'o', long = "output-dir", required = true)]
+    pub output_dir: PathBuf,
+
+    /// Report file prefix - creates {report}.json
+    #[arg(short = 'r', long)]
+    pub report: String,
+
+    /// Number of worker threads for parsing and pairing
+    #[arg(short = 't', long, default_value_t = 4)]
+    pub threads: usize,
+
+    #[command(flatten)]
+    pub thresholds: ThresholdMetrics,
 }
 

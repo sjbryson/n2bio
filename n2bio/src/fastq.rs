@@ -8,6 +8,7 @@ use std::hash::{Hash, Hasher};
 use rustc_hash::{FxHashMap, FxHasher};
 
 use crate::sam::{SamRecord, SamStr, SamFlags};
+use crate::bam::{ BamRecord, BamFlags };
 use crate::readers::ReaderType;
 use crate::writers::WriterType;
 use crate::sequence::DnaSequence;
@@ -59,6 +60,11 @@ impl FastqRecord<SingleRead> {
     /// Create a single FASTQ record from a SamRecord.
     pub fn from_samrec(rec: &SamRecord) -> Self {
         Self::new(rec.qname.clone(), rec.seq.clone(), rec.qual.clone())
+    }
+    /// Create a single FASTQ record from a BamRecord.
+    pub fn from_bamrec(rec: &BamRecord) -> Self {
+        let (qname, seq, qual) = rec.to_fastq_fields();
+        Self::new(qname, seq, qual)
     }
 }
 
@@ -118,6 +124,16 @@ impl PairedRead {
             PairedRead::R2(FastqRecord::<Read2>::new(
                 rec.qname, rec.seq, rec.qual
             ))
+        }
+    }
+
+    pub fn from_bamrec(rec: &BamRecord) -> Self {
+        let (qname, seq, qual) = rec.to_fastq_fields();
+
+        if rec.is_read1() {
+            PairedRead::R1(FastqRecord::<Read1>::new(qname, seq, qual))
+        } else {
+            PairedRead::R2(FastqRecord::<Read2>::new(qname, seq, qual))
         }
     }
 }

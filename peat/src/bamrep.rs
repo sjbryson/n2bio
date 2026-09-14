@@ -1,11 +1,7 @@
 //! n2bio/peat/src/bamrep.rs
 //! 
 
-#![allow(unused)]
-
-use std::todo;
 use std::io;
-use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
@@ -81,7 +77,7 @@ pub(crate) fn run(args: BamRepArgs) -> io::Result<()> {
     println!("BAM reading complete. Processed {} pairs. Generating summaries and plots...", total_pairs);
 
     // Group all stats into a list so Rayon can process/finalize them concurrently
-    let mut stats_to_process = vec![
+    let stats_to_process = vec![
         ("pe_insert_size", alignment_stats.pe_insert_size),
         ("r1_mapq", alignment_stats.r1_mapq),
         ("r2_mapq", alignment_stats.r2_mapq),

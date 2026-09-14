@@ -19,7 +19,7 @@ use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats
 
 use crate::cli::CoverageArgs;
 use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
-use crate::samfilters::{ highpass_filter, threshold_args };
+use crate::alignmentfilters::{ highpass_samfilter, threshold_args };
 
 // ============================================================================
 // Coverage Stats
@@ -165,7 +165,7 @@ pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
                 let sam: SamStr<'_> = SamStr::new(&line);
                 t_align.fetch_add(1, Ordering::Relaxed);
                 
-                if highpass_filter(&sam, &worker_args.thresholds, has_thresholds) {
+                if highpass_samfilter(&sam, &worker_args.thresholds, has_thresholds) {
                     let is_primary: bool = sam.is_primary();
                     if is_primary {
                         p_prim.fetch_add(1, Ordering::Relaxed);
