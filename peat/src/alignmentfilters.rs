@@ -7,7 +7,7 @@ use n2bio::bam::{ BamRecord, BamStats, BamFlags };
 use crate::cli::ThresholdMetrics;
 
 // ============================================================================
-// SAM Filter Functions
+// SAM/BAM Filter Functions
 // ============================================================================
 
 pub(crate) fn threshold_args(args: &ThresholdMetrics) -> bool {
@@ -81,6 +81,38 @@ pub(crate) fn highpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, threshol
     true
 }
 
+#[allow(dead_code)]
+pub(crate) fn lowpass_bamfilter(record: &BamRecord, args: &ThresholdMetrics, thresholds: bool) -> bool {
+    // Keep all unmapped reads
+    if !record.is_mapped() {
+        return true;
+    }
+    // If it is mapped and there are no defined thresholds - return false
+    if !thresholds {
+        return false;
+    }
+    // Otherwise evaluate all optional filters
+    if args.align_prop.is_some_and(|max: f32| record.calculate_alignment_proportion().is_some_and(|val: f32| val > max)) {
+        return false;
+    }
+    if args.align_ident.is_some_and(|max: f32| record.calculate_alignment_identity().is_some_and(|val: f32| val > max)) {
+        return false;
+    }
+    if args.align_score.is_some_and(|max: i32| record.get_int_tag(b"AS").is_some_and(|val: i32| val > max)) {
+        return false;
+    }
+    if args.align_length.is_some_and(|max: u32| record.calculate_alignment_length().is_some_and(|val: u32| val > max)) {
+        return false;
+    }
+    if args.base_score.is_some_and(|max: f32| record.calculate_base_score().is_some_and(|val: f32| val > max)) {
+        return false;
+    }
+    if args.mapq.is_some_and(|max: u32| u32::from(record.mapq) > max) {
+        return false;
+    }
+    // If it is mapped and not exceeding any of the specified max thresholds - return true
+    true
+}
 
 pub(crate) fn highpass_bamfilter(record: &BamRecord, args: &ThresholdMetrics, thresholds: bool) -> bool {
     if !record.is_mapped() {

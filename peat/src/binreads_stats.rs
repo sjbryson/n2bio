@@ -7,6 +7,10 @@ use std::fs::File;
 use std::io::{self, BufWriter};
 use std::path::Path;
 
+// ============================================================================
+// BinStats
+// ============================================================================
+
 #[derive(Debug, Default, Serialize)]
 pub struct BinStats {
     pub concordant_pairs: usize,
@@ -15,6 +19,10 @@ pub struct BinStats {
     pub r2_orphans: usize,
     pub total_pairs_written: usize,
 }
+
+// ============================================================================
+// BinReadReport
+// ============================================================================
 
 #[derive(Debug, Default, Serialize)]
 pub struct BinReadReport {

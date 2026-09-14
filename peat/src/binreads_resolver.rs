@@ -6,6 +6,9 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
+// ============================================================================
+// BinResolver
+// ============================================================================
 pub struct BinResolver {
     target_to_bin: Option<HashMap<String, String>>,
 }

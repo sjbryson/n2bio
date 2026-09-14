@@ -11,6 +11,10 @@ use lru::LruCache;
 use n2bio::fastq::{PairedFastqRecord, PairedFastqWriter};
 use n2bio::writers::WriterType;
 
+// ============================================================================
+// BinnedFastqPool
+// ============================================================================
+
 pub struct BinnedFastqPool {
     /// LRU Cache holding open active PairedFastqWriters per bin.
     cache: LruCache<String, PairedFastqWriter<WriterType, WriterType>>,

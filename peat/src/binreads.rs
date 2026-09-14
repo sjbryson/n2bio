@@ -13,17 +13,17 @@ use crate::binreads_stats::BinReadReport;
 
 
 pub(crate) fn run(args: BinReadsArgs) -> io::Result<()> {
-    // 1. Initialize Reader and Header
+    // Initialize BamReader and BamHeader
     let mut bam_reader: BamReader = BamReader::open(args.bam.to_str().unwrap())?;
     let header: BamHeader = bam_reader.read_header()?;
 
-    // 2. Initialize Target Resolver
+    // Initialize target resolver
     let bin_resolver: BinResolver = BinResolver::new(args.reference_map.as_deref())?;
 
-    // 3. Setup Threshold Evaluator state
+    // Setup threshold evaluator state
     let threshold_active: bool = threshold_args(&args.thresholds);
 
-    // 4. Setup Writer Pool
+    // Setup Writer Pool
     let max_open_bins: usize = 64;
     let gz_threads: usize = if args.threads > 2 { 2 } else { 1 };
 
@@ -37,13 +37,13 @@ pub(crate) fn run(args: BinReadsArgs) -> io::Result<()> {
 
     let mut bin_stats: BinReadReport = BinReadReport::default();
 
-    // 5. Streaming Loop State
+    // Streaming Loop State
     let mut current_record: BamRecord = BamRecord::default();
     let mut r1_record: Option<BamRecord> = None;
     let mut r2_record: Option<BamRecord> = None;
     let mut prev_qname: Vec<u8> = Vec::new();
 
-    // 6. Main Streaming Reader Loop (Name-Sorted Expectation)
+    // Main Streaming Reader Loop (Name-Sorted Expectation)
     while bam_reader.read_record(&mut current_record)? {
         // When qname changes, evaluate the previous read pair
         if current_record.read_name != prev_qname {
@@ -72,7 +72,7 @@ pub(crate) fn run(args: BinReadsArgs) -> io::Result<()> {
         }
     }
 
-    // 7. Flush trailing final pair after EOF
+    // Flush trailing final pair after EOF
     if let (Some(r1), Some(r2)) = (r1_record.take(), r2_record.take()) {
         evaluate_and_bin_pair(
             r1,
@@ -86,11 +86,11 @@ pub(crate) fn run(args: BinReadsArgs) -> io::Result<()> {
         )?;
     }
 
-    // 8. Safely flush all writer buffers and close gzip handles
+    // Flush all writer buffers and close gzip handles
     pool.finish_all()?;
 
-    // 9. Write JSON report
-    let report_path = args.output_dir.join(format!("{}.bin_report.json", args.report));
+    // Write JSON report
+    let report_path: std::path::PathBuf = args.output_dir.join(format!("{}.bin_report.json", args.report));
     bin_stats.write_json(&report_path)?;
 
     Ok(())
@@ -108,28 +108,28 @@ fn evaluate_and_bin_pair(
     pool: &mut BinnedFastqPool,
     stats: &mut BinReadReport,
 ) -> io::Result<()> {
-    // 1. Highpass Filters
-    let r1_pass = highpass_bamfilter(&r1, thresholds, threshold_active);
-    let r2_pass = highpass_bamfilter(&r2, thresholds, threshold_active);
+    // Highpass filter
+    let r1_pass: bool = highpass_bamfilter(&r1, thresholds, threshold_active);
+    let r2_pass: bool = highpass_bamfilter(&r2, thresholds, threshold_active);
 
     if !r1_pass && !r2_pass {
         return Ok(());
     }
 
-    // 2. Resolve Target Names -> Bin IDs
-    let bin_r1 = if r1_pass {
+    // Resolve Target Names -> Bin IDs
+    let bin_r1: Option<&str> = if r1_pass {
         r1.target_name(header).and_then(|t| resolver.get_bin(t))
     } else {
         None
     };
 
-    let bin_r2 = if r2_pass {
+    let bin_r2: Option<&str> = if r2_pass {
         r2.target_name(header).and_then(|t| resolver.get_bin(t))
     } else {
         None
     };
 
-    // 3. Convert BamRecord -> PairedRead -> PairedFastqRecord
+    // Convert BamRecord -> PairedRead -> PairedFastqRecord
     let p_r1: PairedRead = PairedRead::from_bamrec(&r1);
     let p_r2: PairedRead = PairedRead::from_bamrec(&r2);
 
