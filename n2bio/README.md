@@ -21,7 +21,7 @@ Or add the following line to your Cargo.toml:
 ```n2bio = "0.1.0"```
 
 
-**n2bio/** - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
+**Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.**
   - sam.rs      - Read and work with SAM formatted alignment records.
   - bam.rs      - Read and work with BAM formatted alignment records.
   - fastq.rs    - Read and write fastq files.

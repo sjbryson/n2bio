@@ -1,4 +1,6 @@
-<img width="1200" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
+<div align="center">
+    <img width="600" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
+</div>
 
 ## n2bio - a rust workspace and library for building bioinformatics cli tools
 
