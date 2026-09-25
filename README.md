@@ -53,7 +53,7 @@ cargo build --release
 - **peat filter** - Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz).
 - **peat coverage** - Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header
 - **peat bam-rep** - Read a name sorted bam file and generate an interactive report
-- **peat bin-reads** - ToDo: Parse SAM records from stdin or BAM and bin read pairs for each target
+- **peat bin-reads** - Parse SAM records from stdin or BAM and bin read pairs for each target
   
 ---
 

@@ -3,15 +3,16 @@
     <img width="600" alt="logo-n2bio 2" src="../assets/n2bio-logo.png" />
 </div>
 
-## n2bio v0.1.1 - a rust workspace and library for building bioinformatics cli tools
+## n2bio v0.1.1 - a workspace and library for building bioinformatics cli tools
 
 *I created this repo as part of my rust learning journey - building cli tools that I use in my own research & using LLM's along the way.*
 
-This crate is still under active development. It is expected that new features will be added regularly.
+This crate is under active development. It is expected that new features will be added regularly.
 
 Version 0.1.0 is available at crates.io
 
-**Install**
+**Installation**
+
 Run the following Cargo command in your project directory:
 
 ```cargo add n2bio```
@@ -30,5 +31,5 @@ Or add the following line to your Cargo.toml:
   - kmer.rs     - Traits to work with kmers.
   - hist.rs     - Structs and functions to work with distributions and associated stats.
   - metadata.rs - Structs and functions to work with common metadata files (tsv, json, jsonl).
-  - readers.rs  - Boilerplate code for reading files and stdin.
-  - writers.rs  - Boilerplate code for writing data to files and stdout.
+  - readers.rs  - Basic code for reading files and stdin.
+  - writers.rs  - Basic code for writing data to files and stdout.

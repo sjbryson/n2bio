@@ -25,7 +25,7 @@ pub(crate) enum Commands {
     Coverage(CoverageArgs),
     /// Read a name sorted bam file and generate an interactive report.
     BamRep(BamRepArgs),
-    /// ToDo: Read a name sorted bam file and bin read pairs for each target.
+    /// Read a name sorted bam file and bin read pairs for each target.
     BinReads(BinReadsArgs),
 }
 
@@ -58,19 +58,19 @@ pub(crate) struct ThresholdMetrics {
     #[arg(long = "align_length", alias = "AL")]
     pub align_length: Option<u32>,
 
-    /// Optional: Per base alignment score (AS/AL = avg. align_score per covered base) - sam.calculate_as_al()
+    /// Optional: Per base alignment score (BS = AS/AL, avg. align_score per covered base)
     #[arg(long = "base_score", alias = "BS")]
     pub base_score: Option<f32>,
 
-    /// Optional: Alignment Proportion - sam.calculate_alignment_proportion()
+    /// Optional: Alignment Proportion
     #[arg(long = "align_prop", alias = "AP")]
     pub align_prop: Option<f32>,
     
-    /// Optional: Alignment Percent Identity - sam.calculate_alignment_accuracy()
+    /// Optional: Alignment Percent Identity
     #[arg(long = "align_ident", alias = "AI")]
     pub align_ident: Option<f32>,
 
-    /// Optional: Max MAPQ score - sam.mapq()
+    /// Optional: MAPQ score
     #[arg(long = "mapq", alias = "MQ")]
     pub mapq: Option<u32>,
 }
