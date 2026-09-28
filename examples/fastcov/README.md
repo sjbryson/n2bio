@@ -24,7 +24,7 @@ And if you want to test filtering parameters from an existing sam/bam file:
 samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
 ```
 
-An optional metadata file (--metadata or -m) can be used to add additional information for each reference sequence in the coverage report. The --metadata_key or -k option tells fastcov which column or field in the metadata file corresponds to the reference sequence identifier - e.g. a column named "accession" could refer to the accessions in the reference database that was aligned to - these should match what you would see in a sam/bam header. All additional fields and values will be included in the report.json file.
+An optional metadata file (--metadata or -m) can be used to add additional information for each reference sequence in the coverage report. The --metadata_key or -k option tells fastcov which column or field in the metadata file corresponds to the reference sequence identifier - e.g. a column named "accession" could refer to the accessions in the reference database that was aligned to - these should match what you would see in a sam/bam header. All additional fields and values associated with each key will be included in the report.json file.
 
 ```
 Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
