@@ -14,13 +14,13 @@ Usage: fastfilter [OPTIONS] --fq-prefix <FQ_PREFIX>
 
 Options:
   -t, --threads <THREADS>      Number of worker threads for parsing and pairing [default: 4]
-      --shards <SHARDS>        Number of shards for the ShardedMateMap (recommend 4-8x threads) [default: 64]
+      --shards <SHARDS>        Number of shards for the ShardedMateMap (recommend 4-8x threads) [default: 32]
   -p, --fq-prefix <FQ_PREFIX>  Prefix for output files (e.g. 'out' -> out_r1.fq.gz, out_r2.fq.gz)
       --max-ap <MAX_AP>        Optional: Max Alignment Proportion
-      --max-ai <MAX_PI>        Optional: Max Alignment Identity
+      --max-ai <MAX_AI>        Optional: Max Alignment Identity
       --max-as <MAX_AS>        Optional: Max Alignment Score
       --max-al <MAX_AL>        Optional: Max Alignment Lenth
-      --max-bs <MAX_SL>        Optional: Max per base alignment score
+      --max-bs <MAX_BS>        Optional: Max per base alignment score
       --max-mq <MAX_MQ>        Optional: Max MAPQ score
   -h, --help                   Print help
   -V, --version                Print version
