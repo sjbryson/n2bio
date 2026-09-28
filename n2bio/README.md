@@ -18,7 +18,7 @@ Run the following Cargo command in your project directory:
 
 Or add the following line to your Cargo.toml:
 
-```n2bio = "0.1.0"```
+```n2bio = "0.1.1"```
 
 
 **Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.**
