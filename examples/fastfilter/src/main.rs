@@ -13,7 +13,7 @@ use n2bio::writers::WriterType;
 
 
 #[derive(Parser, Debug, Clone)]
-#[command(author, version, about = "High-performance SAM stream to paired FASTQ filter", long_about = None)]
+#[command(author, version, about = "Filter SAM from stdin and write to paired FASTQ", long_about = None)]
 struct Args {
 
     /// Number of worker threads for parsing and pairing
