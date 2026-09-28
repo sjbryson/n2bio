@@ -1,5 +1,6 @@
 //! peat/src/bamstats.rs
 //! 
+
 use serde::Serialize;
 use std::collections::HashMap;
 

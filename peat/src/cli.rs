@@ -1,8 +1,6 @@
 //! n2bio/peat/src/cli.rs
 //! 
 
-#![allow(unused)]
-
 use clap::{ Args, Parser, Subcommand, ValueEnum };
 use std::path::PathBuf;
 

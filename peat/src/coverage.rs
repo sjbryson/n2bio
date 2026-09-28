@@ -1,10 +1,6 @@
 //! n2bio/peat/src/coverage.rs
 //! 
 
-#![allow(unused)]
-
-use std::todo;
-use clap::Parser;
 use crossbeam::channel::bounded;
 use std::io::{self, BufRead};
 use std::thread;
@@ -16,10 +12,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use n2bio::metadata::Metadata;
-use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags };
 
 use crate::cli::CoverageArgs;
-use crate::cli::{ FilterArgs, ThresholdMode, ThresholdMetrics };
 use crate::alignmentfilters::{ highpass_samfilter, threshold_args };
 
 // ============================================================================
