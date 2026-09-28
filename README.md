@@ -2,13 +2,13 @@
     <img width="480" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
 </div>
 
-## n2bio - a rust workspace and library for building bioinformatics cli tools
+# n2bio - a rust workspace and library for building bioinformatics cli tools
 
 *I created this repo as part of my rust learning journey - building cli tools that I use in my own research & using LLM's along the way.*
 
 ---
 
-### Setup & Installation
+## Setup & Installation
 
 1. **Install Cargo:** Ensure you have Rust and Cargo installed on your system. If you don't have it, follow the official installation instructions on [rustup.rs](https://rustup.rs/).
 
@@ -26,7 +26,7 @@ cargo build --release
 
 ---
 
-### Library:
+## Library:
 
 [**n2bio/**](./n2bio) - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
   - sam.rs      - Read and work with SAM formatted alignment records.
@@ -41,7 +41,7 @@ cargo build --release
   - writers.rs  - Boilerplate code for writing data to files and stdout.
 
 ---
-### Examples:
+## Examples:
 
 [**fastfilter/**](./examples/fastfilter) - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 - *Example usage for reading and filtering sam records from stdin and writing paired fastq records.*
