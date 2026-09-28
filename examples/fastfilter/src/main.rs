@@ -28,20 +28,15 @@ struct Args {
     #[arg(short = 'p', long, required = true)]
     fq_prefix: String,
     
-    // make optional if --stdout interleaved or --interleaved (pe vs lr) options
-
-    /// Name of the run/sample for the JSON report -> creates {report}.json #########################################
-    //#[arg(short = 'r', long, required = true)]                              // ====== Update output logic ===========
-    //report: String,
-
     /// If none of the following optional max stats are set, only unmapped pairs are written.
+    
     /// Optional: Max Alignment Proportion - sam.calculate_alignment_proportion()
     #[arg(long = "max-ap")]
     max_ap: Option<f32>,
     
-    /// Optional: Max Percent Identity - sam.calculate_alignment_accuracy()
-    #[arg(long = "max-pi")]
-    max_pi: Option<f32>,
+    /// Optional: Max Alignment Identity - sam.calculate_alignment_identity()
+    #[arg(long = "max-ai")]
+    max_ai: Option<f32>,
     
     /// Optional: Max Alignment Score - sam.get_int_tag("AS")
     #[arg(long = "max-as")]
@@ -51,9 +46,9 @@ struct Args {
     #[arg(long = "max-al")]
     max_al: Option<u32>,
     
-    /// Optional: Max AS/AL score (avg. AS per covered base) - sam.calculate_as_al()
-    #[arg(long = "max-sl")]
-    max_sl: Option<f32>,
+    /// Optional: Max per base alignment score (avg. AS per covered base) - sam.calculate_base_score()
+    #[arg(long = "max-bs")]
+    max_bs: Option<f32>,
 
     /// Optional: Max MAPQ score - sam.mapq()
     #[arg(long = "max-mq")]
@@ -70,7 +65,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if args.max_ap.is_some_and(|max: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val <= max)) {
         return true;
     }
-    if args.max_pi.is_some_and(|max: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val <= max)) {
+    if args.max_ai.is_some_and(|max: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val <= max)) {
         return true;
     }
     if args.max_as.is_some_and(|max: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val <= max)) {
@@ -79,7 +74,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if args.max_al.is_some_and(|max: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val <= max)) {
         return true;
     }
-    if args.max_sl.is_some_and(|max: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val <= max)) {
+    if args.max_bs.is_some_and(|max: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val <= max)) {
         return true;
     }
     if args.max_mq.is_some_and(|max: u32| sam.mapq() <= max) {
@@ -200,10 +195,10 @@ fn main() -> io::Result<()> {
         "written_pairs"  : pairs_written,
         "orphaned_reads" : mate_map.orphan_count(),
         "max_ap"         : args.max_ap.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_pi"         : args.max_pi.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "max_ai"         : args.max_ai.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
         "max_as"         : args.max_as.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
         "max_al"         : args.max_al.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
-        "max_sl"         : args.max_sl.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+        "max_bs"         : args.max_bs.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
         "max_mq"         : args.max_mq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
     });
 

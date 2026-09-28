@@ -38,7 +38,7 @@ struct Args {
     #[arg(long)]
     min_ap: Option<f32>,
     
-    /// Optional: Min Percent Identity - sam.calculate_alignment_identity()
+    /// Optional: Min Alignment Identity - sam.calculate_alignment_identity()
     #[arg(long)]
     min_ai: Option<f32>,
     
