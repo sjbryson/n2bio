@@ -45,11 +45,11 @@ cargo build --release
 
 [**fastfilter/**](./examples/fastfilter) - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
 - *Example usage for reading and filtering sam records from stdin and writing paired fastq records.*
-- *fastfilter is now a subcommand in the [peat cli tool](./peat) as a subcommand ```peat filter```
+- *fastfilter is now a subcommand in the [peat cli tool](./peat) as a subcommand* ```peat filter```
 
 [**fastcov/**](./examples/fastcov) - Another tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
 - *Example usage for reading and filtering sam records from stdin.*
-- *fastcov is now a subcommand in the [peat cli tool](./peat) as a subcommand ```peat coverage```
+- *fastcov is now a subcommand in the [peat cli tool](./peat) as a subcommand* ```peat coverage```
 
 [**pfqbz2gz/**](./examples/pfqbz2gz) - Tool to convert paired fastq records in bz2 format to gz format.
 - *Example usage of paired fastq readers and writers.*
