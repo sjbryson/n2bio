@@ -15,7 +15,7 @@ pub(crate) fn threshold_args(args: &ThresholdMetrics) -> bool {
         args.align_length.is_some() || args.base_score.is_some() || args.mapq.is_some() 
     }
 
-/// Low pass filter logic - must be unmapped or pass all defined thresholds
+/// Low pass filter logic - must be unmapped and pass all defined thresholds
 pub(crate) fn lowpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
     // Keep all unmapped reads
     if !sam.is_mapped() {
@@ -48,7 +48,7 @@ pub(crate) fn lowpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, threshold
     true
 }
 
-/// Highpass filter logic - must be mapped or pass all defined thresholds
+/// Highpass filter logic - must be mapped and pass all defined thresholds
 pub(crate) fn highpass_samfilter(sam: &SamStr, args: &ThresholdMetrics, thresholds: bool) -> bool {
     // Check if read is mapped
     if !sam.is_mapped() {
