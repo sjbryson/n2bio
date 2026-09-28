@@ -338,7 +338,7 @@ pub(crate) fn run(args: CoverageArgs) -> io::Result<()> {
 
     let summary: serde_json::Value = serde_json::json!({
         "alignment_stats": {
-            "report"                    : args.report,
+            "report"                      : args.report,
             "total_run_time_seconds"      : start_time.elapsed().as_secs_f64(),
             "total_alignments"            : total_alignments.load(Ordering::Relaxed),
             "passed_primary_alignments"   : passed_primary.load(Ordering::Relaxed),

@@ -1,5 +1,5 @@
 <div align="center">
-    <img width="600" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
+    <img width="480" alt="logo-n2bio 2" src="./assets/n2bio-logo.png" />
 </div>
 
 ## n2bio - a rust workspace and library for building bioinformatics cli tools
@@ -28,7 +28,7 @@ cargo build --release
 
 ### Library:
 
-**n2bio/** - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
+[**n2bio/**](./n2bio) - Modules I'm developing to work with standard file formats, IO, and common bioinformatics data.
   - sam.rs      - Read and work with SAM formatted alignment records.
   - bam.rs      - Read and work with BAM formatted alignment records.
   - fastq.rs    - Read and write fastq files.
@@ -41,12 +41,33 @@ cargo build --release
   - writers.rs  - Boilerplate code for writing data to files and stdout.
 
 ---
+### Examples:
 
-### Cli Tools:
+[**fastfilter/**](./examples/fastfilter) - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
+- *Example usage for reading and filtering sam records from stdin and writing paired fastq records.*
+- *fastfilter is now a subcommand in the [peat cli tool](./peat) as a subcommand ```peat filter```
 
-<p style="text-align:center"><img width="200" alt="peat-logo" src="./assets/peat-logo.png" /></p>
+[**fastcov/**](./examples/fastcov) - Another tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
+- *Example usage for reading and filtering sam records from stdin.*
+- *fastcov is now a subcommand in the [peat cli tool](./peat) as a subcommand ```peat coverage```
 
-**<p style="text-align: center"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</p>**  [here](./peat)
+[**pfqbz2gz/**](./examples/pfqbz2gz) - Tool to convert paired fastq records in bz2 format to gz format.
+- *Example usage of paired fastq readers and writers.*
+
+---
+
+## Tools Under Development:
+
+<div align="center">
+  <p align="center">
+    <a href="./peat">
+      <img width="180" alt="peat-logo" src="./assets/peat-logo.png" />
+    </a>
+  </p>
+  <p align="center">
+    <a href="./peat"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</a>
+  </p>
+</div>
 
 #### There are several subcommands for working with paired-end alignment records:
 
@@ -55,122 +76,6 @@ cargo build --release
 - **peat bam-rep** - Read a name sorted bam file and generate an interactive report
 - **peat bin-reads** - Parse SAM records from stdin or BAM and bin read pairs for each target
   
----
-
-**fastfilter/** - Tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. and write paired reads that pass filter to {prefix}_r1.fq.gz and {prefix}_r2.fq.gz. For use in a pipeline for host read filtering, eliminating some of the common time consuming write-sort-read-filter steps. Unmapped pairs are retained by default. Optional independent alignment quality metrics can also be applied.
-
-**Pipeline example:**
-
-```
-minimap2 -ax sr --eqx --secondary=no {map_threads} {input_mmi} {r1} {r2} | \
-fastfilter {filter_threads} {max_ap} {max_pi} {max_as} {max_al} {max_sl} {max_mq} {fq_prefix}
-
-
-Usage: fastfilter [OPTIONS] --fq-prefix <FQ_PREFIX>
-
-Options:
-  -t, --threads <THREADS>      Number of worker threads for parsing and pairing [default: 4]
-      --shards <SHARDS>        Number of shards for the ShardedMateMap (recommend 4-8x threads) [default: 64]
-  -p, --fq-prefix <FQ_PREFIX>  Prefix for output files (e.g. 'out' -> out_r1.fq.gz, out_r2.fq.gz)
-      --max-ap <MAX_AP>        Optional: Max Alignment Proportion
-      --max-pi <MAX_PI>        Optional: Max Percent Identity
-      --max-as <MAX_AS>        Optional: Max Alignment Score
-      --max-al <MAX_AL>        Optional: Max Alignment Lenth
-      --max-sl <MAX_SL>        Optional: Max AS/AL score
-      --max-mq <MAX_MQ>        Optional: Max MAPQ score
-  -h, --help                   Print help
-  -V, --version                Print version
-```
-
----
-
-**fastcov/** - Another tool to parse SAM formatted stdout from aligners like minimap2, bowtie2, bwa, etc. Use in metagenomics pipeline for target identification. Parses SAM records in stdout from aligner, calculates target coverage (per base) and stats. SAM records are passed through to stdout and can be used as input for samtools or written to file. Run and target level stats are writen to .json formatted txt file. All paired primary and secondary alignments that score above at least one set minimum thresholds are writtten to primary and secondary coverage arrays. Mismatch counts are also stored in a mismatch array.
-
-**Pipeline example:**
-
-```
-minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
-fastcov {cov_threads} -r {sample} {min_as} | \
-samtools sort {sort_threads} - -o {sample}.sorted.bam
-```
-Or if you don't want to save the sam/bam file - pipe to /dev/null:
-```
-minimap2 -ax sr --eqx {map_threads} {input_mmi} {r1} {r2} | \
-fastcov {cov_threads} -r {sample} {min_as} > /dev/null
-```
-And if you want to test filtering parameters from an existing sam/bam file:
-```
-samtools view -h file.bam | fastcov {cov_threads} -r {sample} {min_as} > /dev/null
-```
-If a viral taxonomy db was created using vref2db (use option --db <path to SQLite db file>) lineage data for the associated Accession will be reported.
-```
-Usage: fastcov [OPTIONS] --run-name <RUN_NAME>
-
-Options:
-  -t, --threads <THREADS>    Number of worker threads for parsing and pairing [default: 4]
-  -r, --run-name <RUN_NAME>  Name of the run/sample for the JSON report
-      --min-ap <MIN_AP>      Optional: Min Alignment Proportion
-      --min-pi <MIN_PI>      Optional: Min Percent Identity
-      --min-as <MIN_AS>      Optional: Min Alignment Score
-      --min-al <MIN_AL>      Optional: Min Alignment Lenth
-      --min-sl <MIN_SL>      Optional: Min AS/AL score
-      --min-mq <MIN_MQ>      Optional: Min MAPQ score
-      --db <DB>              Optional path to an SQLite taxonomy database (see vref2db)
-  -h, --help                 Print help
-  -V, --version              Print version
-```
-
----
-
-**vref2db/** - NCBI Virus-Host taxonomy DB builder. Create an SQLite database for a set of reference viral sequences (NCBI Accessions). 
-
-1. Start by generating a list of Accession ID's from your reference genomes fasta file:
-
-```
-grep ">" viral_refs.fna | awk '{print $1}' | sed 's/>//' > viral_refs.accessions.txt
-```
-
-2. Use NCBI's **datasets** to download taxonomic information in json format.
-
-```
-datasets summary virus genome accession --inputfile viral_refs.accessions.txt > viral_refs.metadata.tsv
-```
-
-3. Download the ncbi [taxdump](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/) to get the nodes.dmp file.
-
-4. Run **vref2db**:
-
-```
-vref2db --db db_name --json viral_refs.metadata.json --nodes nodes.dmp
-
-Usage: vref2db --db <DB> --json <JSON> --nodes <NODES>
-
-Options:
-      --db <DB>        Name of the SQLite database to create (e.g., taxonomy.db)
-      --json <JSON>    Path to the JSON report generated by NCBI Datasets
-      --nodes <NODES>  Path to the nodes.dmp file
-  -h, --help           Print help
-  -V, --version        Print version
-
-```
----
-
-**bamrep/** - Generate a report from a name sorted bam file for an alignment of paired end reads. Optional Html and Svg reports in addition to standard json output of summary stats + histograms for insert size (calculated using alignments that pass user defined max insert size and min mapq values), mapq values, alignment scores, alignment lengths, per base alignments cores, alignment proportions, and alignment percent identities. Html output (--html option) uses plotly, has sliders to check thresholds for filtering alignments, and allows savingindividual plots as svg files.
-
-```
-Usage: bamrep [OPTIONS] --bam <BAM> --report <REPORT>
-
-Options:
-  -b, --bam <BAM>            Input name-sorted BAM file
-  -r, --report <REPORT>      Output JSON report file
-      --html                 Generate html plots
-  -q, --min-mapq <MIN_MAPQ>  Minimum MAPQ score for insert size calculation [default: 40]
-  -i, --max-ins <MAX_INS>    Max insert size to use for summary stats calculation [default: 1000]
-  -l, --max-len <MAX_LEN>    Max read length to use [default: 150]
-  -h, --help                 Print help
-  -V, --version              Print version
-```
-
 ---
 
 **pfqsim/** - Suite of tools to generate synthetic sequencing libraries and test alignment based classification performance.
@@ -193,21 +98,3 @@ Options:
 See the [pfqsim README](./pfqsim/README.md) for more information and examples.
 
   ---
-
-### Cli Utilities:
-
-**pfqbz2gz/** - Tool to convert paired fastq records in bz2 format to gz format.
-
-```
-Usage: pfqbz2gz [OPTIONS] --r1 <R1> --r2 <R2> --output-prefix <OUTPUT_PREFIX>
-
-Options:
-  -1, --r1 <R1>                        Path to R1 bz2 file
-  -2, --r2 <R2>                        Path to R2 bz2 file
-  -o, --output-prefix <OUTPUT_PREFIX>  Output prefix for the new gz files (e.g. 'sample1' becomes 'sample1_R1.fq.gz')
-  -t, --threads <THREADS>              Total CPU threads to allocate across the pipeline [default: 4]
-  -h, --help                           Print help
-  -V, --version                        Print version
-```
-
----

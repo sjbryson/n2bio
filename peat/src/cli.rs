@@ -125,7 +125,7 @@ pub(crate) struct CoverageArgs {
     pub report: String,
 
     /// Optional path to a metadata file
-    #[arg(short = 'm', long)]
+    #[arg(short = 'm', long, requires = "metadata_key")]
     pub metadata: Option<String>,
 
     /// Optional metadata keyword

@@ -9,9 +9,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use std::io::Write;
 use std::collections::HashMap;
-use rusqlite::Connection;
-use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use std::path::Path;
 
+use n2bio::sam::{SamReader, SamStr, SamFields, SamFlags, SamTags, AlignmentStats};
+use n2bio::metadata::Metadata;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about = "High-performance SAM filter", long_about = None)]
@@ -21,21 +22,25 @@ struct Args {
     #[arg(short = 't', long, default_value_t = 4)]
     threads: usize,
 
-    /// Name of the run/sample for the JSON report -> creates {run_name}.json
+    /// Name of the run/sample for the JSON report -> creates {report}.json
     #[arg(short = 'r', long, required = true)]
-    run_name: String,
+    report: String,
 
-     /// Optional path to an SQLite taxonomy database (see vref2db)
-    #[arg(long)]
-    db: Option<String>,
+    /// Optional path to a metadata file
+    #[arg(short = 'm', long, requires = "metadata_key")]
+    metadata: Option<String>,
+
+    /// Optional metadata keyword
+    #[arg(short = 'k', long)]
+    metadata_key: Option<String>,
 
     /// Optional: Min Alignment Proportion - sam.calculate_alignment_proportion()
     #[arg(long)]
     min_ap: Option<f32>,
     
-    /// Optional: Min Percent Identity - sam.calculate_alignment_accuracy()
+    /// Optional: Min Percent Identity - sam.calculate_alignment_identity()
     #[arg(long)]
-    min_pi: Option<f32>,
+    min_ai: Option<f32>,
     
     /// Optional: Min Alignment Score - sam.get_int_tag("AS")
     #[arg(long)]
@@ -45,9 +50,9 @@ struct Args {
     #[arg(long)]
     min_al: Option<u32>,
     
-    /// Optional: Min AS/AL score - sam.calculate_as_al()
+    /// Optional: Min per base alignment score - sam.calculate_base_score()
     #[arg(long)]
-    min_sl: Option<f32>,
+    min_bs: Option<f32>,
 
     /// Optional: Min MAPQ score - sam.mapq()
     #[arg(long)]
@@ -65,7 +70,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if args.min_ap.is_some_and(|min: f32| sam.calculate_alignment_proportion().ok().flatten().is_some_and(|val: f32| val < min)) {
         return false;
     }
-    if args.min_pi.is_some_and(|min: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val < min)) {
+    if args.min_ai.is_some_and(|min: f32| sam.calculate_alignment_identity().ok().flatten().is_some_and(|val: f32| val < min)) {
         return false;
     }
     if args.min_as.is_some_and(|min: i32| sam.get_int_tag("AS").is_some_and(|val: i32| val < min)) {
@@ -74,7 +79,7 @@ fn sam_filter(sam: &SamStr, args: &Args) -> bool {
     if args.min_al.is_some_and(|min: u32| sam.calculate_alignment_length().ok().flatten().is_some_and(|val: u32| val < min)) {
         return false;
     }
-    if args.min_sl.is_some_and(|min: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val < min)) {
+    if args.min_bs.is_some_and(|min: f32| sam.calculate_base_score().ok().flatten().is_some_and(|val: f32| val < min)) {
         return false;
     }
     if args.min_mq.is_some_and(|min: u32| sam.mapq() < min) {
@@ -127,8 +132,7 @@ enum PipelineMsg {
 fn main() -> io::Result<()> {
     let start_time: Instant = Instant::now();
     let args: Args          = Args::parse();
-    let out_json: String    = format!("{}.json", args.run_name);
-
+    
     // Global Counters
     let total_alignments: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
     let passed_primary: Arc<AtomicU64>   = Arc::new(AtomicU64::new(0));
@@ -283,28 +287,31 @@ fn main() -> io::Result<()> {
     let ref_map: HashMap<String, RefStats> = aggregator_handle.join().unwrap();
 
     // ============================================================================
+    // METADATA INITIALIZATION
+    // ============================================================================
+    // Load metadata file if provided (supports TSV, JSON, or JSONL based on file extension/args)
+    let metadata: Option<Metadata> = if let Some(ref meta_path_str) = args.metadata {
+    let key_col: &str = args.metadata_key.as_deref().unwrap_or("accession");
+    let meta_path: &Path = Path::new(meta_path_str);
+        
+        let meta: Metadata = match meta_path.extension().and_then(|s| s.to_str()) {
+            Some("tsv") | Some("txt") => Metadata::from_tsv(meta_path, key_col),
+            Some("json") => Metadata::from_json(meta_path, key_col),
+            Some("jsonl") | Some("ndjson") => Metadata::from_jsonl(meta_path, key_col),
+            _ => Metadata::from_tsv(meta_path, key_col), // Default fallback
+        }.expect("Failed to load metadata file");
+
+        Some(meta)
+    } else {
+        None
+    };
+
+    // ============================================================================
     // JSON EXPORT
     // ============================================================================
     let mut num_refs_primary: u32 = 0;
     let mut num_refs_secondary: u32 = 0;
-    let mut coverage_stats: Vec<serde_json::Value> = Vec::new();
-
-
-    // Setup SQLite Connection & Prepare Statement (if --db is provided)
-    let conn: Option<Connection> = args.db.as_ref().map(|db_path| {
-        rusqlite::Connection::open(db_path).expect("Failed to open SQLite database")
-    });
-
-    let mut stmt: Option<rusqlite::Statement<'_>> = conn.as_ref().map(|c| {
-        c.prepare("SELECT * FROM viral_taxonomy WHERE accession = ?")
-        .expect("Failed to prepare SQL statement")
-    });
-
-    // Array of ranks
-    let ranks: [&str; 8] = [
-        "realm", "kingdom", "phylum", "class", "order", "family","genus", "species"
-    ];
-    
+    let mut coverage_stats: Vec<serde_json::Value> = Vec::new(); 
 
     for (_, stats) in ref_map {
         if stats.num_primary   > 0 { num_refs_primary += 1; }
@@ -340,44 +347,14 @@ fn main() -> io::Result<()> {
 
         // Calculate RPK
         let k: f64   = ref_len_f64 / 1000.0;
-        let rpk: f64 = total_reads as f64 / k;
+        let rpk: f64 = stats.num_primary as f64 / k;
 
-        // Query the SQLite Database for the Accession
-        let lineage_json: serde_json::Value = if let Some(ref mut statement) = stmt {
-            // Query the DB.
-            let query_result: Result<serde_json::Value, rusqlite::Error> = statement.query_row([&stats.ref_name], |row| {
-                let mut map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
-
-                // Get the base taxonomy ID and name first
-                let base_tax_id: Option<i64> = row.get("tax_id").ok();
-                let base_name: Option<String> = row.get("name").ok();
-                if let (Some(id), Some(name)) = (base_tax_id, base_name) {
-                    map.insert("organism".to_string(), serde_json::json!({ "tax_id": id, "name": name }));
-                }
-
-                // Loop through the ranks
-                for rank in ranks.iter() {
-                    let id_col: String = format!("{}_id", rank);
-                    let name_col: String = format!("{}_name", rank);
-                    let id: Option<i64> = row.get(id_col.as_str()).ok();
-                    let name: Option<String> = row.get(name_col.as_str()).ok();
-
-                    // Only add the rank to JSON if both ID and Name exist in the row
-                    if let (Some(rank_id), Some(rank_name)) = (id, name) {
-                        map.insert(rank.to_string(), serde_json::json!({ "tax_id": rank_id, "name": rank_name }));
-                    }
-                }
-                
-                Ok(serde_json::Value::Object(map))
-            });
-
-        // If the query was successful, return it. Otherwise return null.
-            query_result.unwrap_or(serde_json::json!(null))
-        
-        } else {
-            // If --db was not provided (stmt is None), return null.
-            serde_json::json!(null)
-        };
+        // Retrieve metadata using reference name (accession)
+        let ref_metadata: serde_json::Value = metadata
+            .as_ref()
+            .and_then(|m| m.lookup(&stats.ref_name))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         // Helper to format the arrays as comma-separated Strings
         let vec_to_string = |v: &Vec<u32>| v.iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
@@ -402,8 +379,8 @@ fn main() -> io::Result<()> {
                     "average_coverage_primary"           : f64::trunc(primary_avg_coverage * 10000.0) / 10000.0,
                     "ref_length"                         : stats.ref_length,
                     "rpk"                                : f64::trunc(rpk * 10000.0) / 10000.0,
-                    "virus_lineage"                      : lineage_json,
-                    "x_coverage" : {
+                    "ref_metadata"                       : ref_metadata,
+                    "ref_coverage" : {
                         "primary_coverage"   : vec_to_string(&stats.primary_coverage),
                         "secondary_coverage" : vec_to_string(&stats.secondary_coverage),
                         "mismatch_coverage"  : vec_to_string(&stats.mismatch_coverage),
@@ -415,25 +392,26 @@ fn main() -> io::Result<()> {
     }
 
     let summary: serde_json::Value = serde_json::json!({
-        "1-run_stats": {
-            "run_name"                    : args.run_name,
+        "alignment_stats": {
+            "report"                      : args.report,
             "total_run_time_seconds"      : start_time.elapsed().as_secs_f64(),
             "total_alignments"            : total_alignments.load(Ordering::Relaxed),
             "passed_primary_alignments"   : passed_primary.load(Ordering::Relaxed),
             "passed_secondary_alignments" : passed_secondary.load(Ordering::Relaxed),
             "num_refs_primary"            : num_refs_primary,
             "num_refs_secondary"          : num_refs_secondary,
-            "min_ap"                      : args.min_ap,
-            "min_pi"                      : args.min_pi,
-            "min_as"                      : args.min_as,
-            "min_al"                      : args.min_al,
-            "min_sl"                      : args.min_sl,
-            "min_mq"                      : args.min_mq,
+            "min_AP"                      : args.min_ap.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AI"                      : args.min_ai.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AS"                      : args.min_as.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_AL"                      : args.min_al.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_BS"                      : args.min_bs.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
+            "min_MQ"                      : args.min_mq.map_or(serde_json::Value::Null, |v| serde_json::json!(v)),
         },
-        "2-coverage_stats"                : coverage_stats
+        "coverage_stats"                : coverage_stats
     });
 
     // Write JSON to file
+    let out_json: String = format!("{}.json", args.report);
     let mut json_file: std::fs::File = std::fs::File::create(&out_json)?;
     json_file.write_all(serde_json::to_string_pretty(&summary).unwrap().as_bytes())?;
 

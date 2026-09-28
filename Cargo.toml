@@ -4,17 +4,16 @@
 resolver = "2"
 members = [
     "n2bio",
-    "fastfilter",
-    "fastcov",
-    "vref2db",
-    "pfqbz2gz",
-    "pfqsim",
-    "bamrep",
+    "examples/fastfilter",
+    "examples/fastcov",
+    "examples/pfqbz2gz",
     "peat",
+    "pfqsim",
+    
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Samuel Bryson <sjbryson@ucla.edu>"]
 description = "A rust workspace for bioinformatics app development"
 edition = "2024"
