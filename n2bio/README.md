@@ -1,15 +1,14 @@
 
 <div align="center">
-    <img width="600" alt="logo-n2bio 2" src="../assets/n2bio-logo.png" />
+    <img width="480" alt="logo-n2bio 2" src="../assets/n2bio-logo.png" />
 </div>
 
 ## n2bio v0.1.1 - a workspace and library for building bioinformatics cli tools
 
 *I created this repo as part of my rust learning journey - building cli tools that I use in my own research & using LLM's along the way.*
 
-This crate is under active development. It is expected that new features will be added regularly.
+This crate is under active development. It is expected that additional documentation and new features will be added regularly.
 
-Version 0.1.0 is available at crates.io
 
 **Installation**
 
