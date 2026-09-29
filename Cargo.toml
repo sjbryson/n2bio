@@ -7,7 +7,6 @@ members = [
     "examples/fastfilter",
     "examples/fastcov",
     "examples/pfqbz2gz",
-    "peat",
     "pfqsim",
     
 ]

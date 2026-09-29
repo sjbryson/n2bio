@@ -58,24 +58,16 @@ cargo build --release
 
 ## Tools Under Development:
 
-<div align="center">
-  <p align="center">
-    <a href="./peat">
-      <img width="180" alt="peat-logo" src="./assets/peat-logo.png" />
-    </a>
-  </p>
-  <p align="center">
-    <a href="./peat"><u>P</u>aired-<u>E</u>nd <u>A</u>lignment <u>T</u>ools</a>
-  </p>
-</div>
+**PEAT** - Paired End Alignment Tools
 
-#### There are several subcommands for working with paired-end alignment records:
+[*Now moved to it's own repository*](https://github.com/sjbryson/peat)
 
-- **peat filter** - Parse SAM records from stdin and filter to create a filtered paired-end fastq.gz library (r1.fq.gz & r2.fq.gz).
-- **peat coverage** - Parse SAM records from stdin and calculate coverage for each reference in the sam/bam header
-- **peat bam-rep** - Read a name sorted bam file and generate an interactive report
-- **peat bin-reads** - Parse SAM records from stdin or BAM and bin read pairs for each target
-  
+A cli tool with several subcommands:
+- filter - process sam formatted alignments in stdin, apply a variety of alignment metric thresholds (e.g. ,apq, alignment percent identity, alignment score, etc.), and write paired reads that pass to new r1.fq.gz and r2.fq.gz files.
+- coverage - process sam formatted alignments in stdin, apply a variety of alignment metric thresholds and calculate coverage for primary alignments, secondary alignments, and mismatches that pass.
+- bam-rep - read a name sorted bam file and generate an interactive html report with different alignment stats.
+- bin-reads - read a name sorted bam file and bin paired reads based on a taget to bin mapping file.
+
 ---
 
 **pfqsim/** - Suite of tools to generate synthetic sequencing libraries and test alignment based classification performance.
